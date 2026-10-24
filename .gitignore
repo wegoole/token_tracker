@@ -1,0 +1,12 @@
+# Runtime artifacts (regenerated on every run)
+ttk.cache.json
+ttk.report.json
+ttk.state.json
+ttk.debug.log
+ttk.last.err.txt
+__pycache__/
+删除/
+
+# Personal data: your subscription fee / FX rate.
+# See README.md for the membership.json template.
+membership.json
