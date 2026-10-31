@@ -3,7 +3,7 @@
 
 扫描 CodeBuddy CLI 的会话记录（默认 ~/.codebuddy-cli/projects 下的 jsonl；
 可用 --projects 参数或环境变量 TTK_PROJECTS 覆盖数据目录），
-按 天 / 调用方式(终端, 弹窗) / 模型 聚合 token，并按 DeepSeek 官方峰谷价计算花销。
+按 天 / 调用方式(终端, 弹窗) / 模型 聚合 token，并按各模型的输入/输出单价估算花销。
 
 调用方式说明：终端 = Windows Terminal 交互会话；弹窗 = WinForms 弹窗驱动的
 headless 会话。两者是同一工具的两种调用方式，共写同一个 projects 目录
@@ -28,6 +28,30 @@ import sys
 import time
 import urllib.request
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+try:
+    from ttk_service import check_signin_today, do_signin, refresh_matrix, get_records_summary, append_scan_record
+except ImportError:
+    try:
+        import ttk_service
+        check_signin_today = ttk_service.check_signin_today
+        do_signin = ttk_service.do_signin
+        refresh_matrix = ttk_service.refresh_matrix
+        get_records_summary = ttk_service.get_records_summary
+        append_scan_record = ttk_service.append_scan_record
+    except Exception:
+        check_signin_today = None
+        do_signin = None
+        refresh_matrix = None
+        get_records_summary = None
+        append_scan_record = None
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_PROJECTS = os.path.join(os.path.expanduser('~'), '.codebuddy-cli', 'projects')
 CACHE = os.path.join(BASE, 'ttk.cache.json')
@@ -40,22 +64,97 @@ WEEK = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 DEFAULT_PRICES = {
     "currency": "CNY",
     "unit": "per_1m_tokens",
-    "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+    "source": "各厂商官网刊例价（list price）；美元价 ×7.15；核对 2026-10-31",
+    "pricing_basis": (
+        "统一口径：一律取厂商官网「刊例价」，不采用限时折扣/活动价/中转站转售价。"
+        "人民币官网价直接填，美元官网价 ×7.15。"
+        "官网未公布缓存价时：缓存命中 = 输入价 ×10%，缓存写入 = 未命中输入价。"
+        "DeepSeek 保留高峰/空闲双档，按请求时间戳判定。"
+    ),
     "fetched_at": "2026-10-17",
     "peak": {"ranges": [[9, 12], [14, 18]], "holidays": []},
     "models": {
         "deepseek-flash": {
-            "aliases": ["deepseek-flash", "deepseek-v4.1-flash", "deepseek-v4-flash",
-                        "deepseek-v4-flash-vision-exp"],
+            "aliases": ["deepseek-flash", "deepseek-v4.1-flash", "deepseek-v4.1-flash-sg",
+                        "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"],
             "hit": {"peak": 0.04, "off": 0.02},
             "miss": {"peak": 2.0, "off": 1.0},
             "out": {"peak": 8.0, "off": 4.0},
+            "source": "DeepSeek 官网刊例价（高峰/空闲双档）",
         },
         "deepseek-v4-pro": {
             "aliases": ["deepseek-v4-pro"],
             "hit": {"peak": 0.30, "off": 0.15},
             "miss": {"peak": 9.0, "off": 4.5},
             "out": {"peak": 27.0, "off": 13.5},
+            "source": "DeepSeek 官网刊例价（高峰/空闲双档）",
+        },
+        "hy3": {
+            "aliases": ["hy3"],
+            "hit": {"peak": 0.25, "off": 0.25},
+            "miss": {"peak": 1.0, "off": 1.0},
+            "out": {"peak": 4.0, "off": 4.0},
+            "source": "腾讯云 TokenHub 官网刊例价",
+        },
+        "hy4-preview": {
+            "aliases": ["hy4-preview"],
+            "hit": {"peak": 0.3, "off": 0.3},
+            "miss": {"peak": 6.0, "off": 6.0},
+            "out": {"peak": 18.0, "off": 18.0},
+            "source": "腾讯云 TokenHub 官网刊例价",
+        },
+        "minimax-m3.1-flash": {
+            "aliases": ["minimax-m3.1-flash", "space-bunny"],
+            "hit": {"peak": 0.1, "off": 0.1},
+            "miss": {"peak": 1.0, "off": 1.0},
+            "out": {"peak": 4.0, "off": 4.0},
+            "source": "MiniMax 官网刊例价（space-bunny 为同模型早期别名）",
+        },
+        "glm-5.3-flash": {
+            "aliases": ["glm-5.3-flash"],
+            "hit": {"peak": 0.23, "off": 0.23},
+            "miss": {"peak": 0.8, "off": 0.8},
+            "out": {"peak": 2.8, "off": 2.8},
+            "source": "智谱官网刊例价（限时五折档 0.4/0.115/1.4 未采用）",
+        },
+        "step-5-preview": {
+            "aliases": ["step-5-preview"],
+            "hit": {"peak": 0.7, "off": 0.7},
+            "miss": {"peak": 7.0, "off": 7.0},
+            "out": {"peak": 20.0, "off": 20.0},
+            "source": "阶跃星辰官网刊例价（缓存命中 2026-10-14 起 0.70）",
+        },
+        "kimi-k3.1-pro": {
+            "aliases": ["kimi-k3.1-pro"],
+            "hit": {"peak": 1.3, "off": 1.3},
+            "miss": {"peak": 13.0, "off": 13.0},
+            "write": {"peak": 13.0, "off": 13.0},
+            "out": {"peak": 68.0, "off": 68.0},
+            "source": "Kimi 官网刊例价",
+        },
+        "kimi-k3": {
+            "aliases": ["kimi-k3"],
+            "hit": {"peak": 2.0, "off": 2.0},
+            "miss": {"peak": 20.0, "off": 20.0},
+            "write": {"peak": 20.0, "off": 20.0},
+            "out": {"peak": 100.0, "off": 100.0},
+            "source": "Kimi 官网刊例价（缓存写入取 5min TTL 档）",
+        },
+        "gpt-6-luna": {
+            "aliases": ["gpt-6-luna"],
+            "hit": {"peak": 0.0715, "off": 0.0715},
+            "miss": {"peak": 0.715, "off": 0.715},
+            "write": {"peak": 0.715, "off": 0.715},
+            "out": {"peak": 3.575, "off": 3.575},
+            "source": "OpenAI 官网刊例价 $0.10/$0.50 ×7.15（缓存命中未公布，按输入 10% 估）",
+        },
+        "gpt-6.1-sol": {
+            "aliases": ["gpt-6.1-sol"],
+            "hit": {"peak": 0.715, "off": 0.715},
+            "miss": {"peak": 14.3, "off": 14.3},
+            "write": {"peak": 14.3, "off": 14.3},
+            "out": {"peak": 71.5, "off": 71.5},
+            "source": "OpenAI 官网刊例价 $2/$0.10/$10 ×7.15",
         },
     },
 }
@@ -64,13 +163,12 @@ DEFAULT_MEMBERSHIP = {
     "plan": "WorkBuddy Pro",
     "currency": "USD",
     "monthly_fee_usd": 7.0,
-    "next_fee_usd": 10.0,
-    "next_effective": "2026-11-01",
-    "usd_cny": 7.15,
-    "note": "会员按月付费；API 价值按 DeepSeek 官方价折算，两者之差即省下的钱",
+    "usd_cny": 6.714,
+    "note": "会员按月付费；API 价值按各模型 Token 单价估算，不含积分",
 }
 
-BUCKETS = ('hit_peak', 'hit_off', 'miss_peak', 'miss_off', 'out_peak', 'out_off')
+BUCKETS = ('hit_peak', 'hit_off', 'miss_peak', 'miss_off',
+           'write_peak', 'write_off', 'out_peak', 'out_off')
 
 # 免费/受限模型分组（按 requestModelId 判定）。429 额度池在渠道级：
 # ds 与混元3（网关 id "hy3"）**共用一个池**（2026-10-24 确认，实证：10-21
@@ -98,8 +196,8 @@ def group_of(model):
 DEFAULT_LIMITS = {
     'ds':       {'req': 1950, 'tokens': 300_000_000,
                  'note': 'ds+混元3 共用池（10-24 合并口径）：10-22/23/24 连续三天 ~1.9k 请求 / ~2.9亿 token 就触 429，上限取触限日水平；warn=80%×阈值'},
-    'step':     {'req': 5000, 'tokens': 1_000_000_000,
-                 'note': '7天观测 0 次429，未触顶；阈值保守占位'},
+    'step':     {'req': 900, 'tokens': 130_000_000,
+                 'note': '10-25 首次实测触限（811req / 1.25亿 吃 429，reset 16:13）；10-24 1437req / 1.73亿 未触限，故上限取触限日量 900req / 1.3亿，warn≈720req / 1.04亿'},
 }
 DEFAULT_WARN_RATIO = 0.8
 
@@ -127,8 +225,9 @@ def load_limits():
     return cfg, ratio
 
 
-def compute_warnings(today, limits, warn_ratio=DEFAULT_WARN_RATIO):
+def compute_warnings(today, limits, warn_ratio=DEFAULT_WARN_RATIO, cooldowns=None):
     ratio = float(warn_ratio)
+    cd = {c['group']: c for c in (cooldowns or [])}
     fm = {f['group']: f for f in (today.get('free_models') or [])}
     err = today.get('errors') or {'total': 0, 'by_model': {}}
     err_bg = {}
@@ -149,9 +248,15 @@ def compute_warnings(today, limits, warn_ratio=DEFAULT_WARN_RATIO):
         else:
             lvl = 0
         level = max(level, lvl)
+        c = cd.get(g) or {}
         out.append({'group': g, 'level': lvl, 'req': req, 'tokens': tok,
                     'threshold_req': spec['req'], 'threshold_tokens': spec['tokens'],
-                    'err429': e429, 'warn_ratio': ratio, 'note': spec.get('note', '')})
+                    'err429': e429, 'warn_ratio': ratio, 'note': spec.get('note', ''),
+                    'model': c.get('model'), 'model_label': c.get('model_label'),
+                    'reset_at': c.get('reset_at'),
+                    'remain': c.get('remain'),
+                    'cooldown': bool(c.get('active')),
+                    'advice': c.get('advice')})
     return out, level
 
 
@@ -253,12 +358,14 @@ def fetch_prices(timeout=8):
             'hit': {'peak': found['hit']['peak'][0], 'off': found['hit']['off'][0]},
             'miss': {'peak': found['miss']['peak'][0], 'off': found['miss']['off'][0]},
             'out': {'peak': found['out']['peak'][0], 'off': found['out']['off'][0]},
+            'source': 'DeepSeek 官方峰谷价',
         },
         'deepseek-v4-pro': {
             'aliases': ['deepseek-v4-pro'],
             'hit': {'peak': found['hit']['peak'][1], 'off': found['hit']['off'][1]},
             'miss': {'peak': found['miss']['peak'][1], 'off': found['miss']['off'][1]},
             'out': {'peak': found['out']['peak'][1], 'off': found['out']['off'][1]},
+            'source': 'DeepSeek 官方峰谷价',
         },
     }
     return models
@@ -278,7 +385,8 @@ def ensure_prices(update=False):
             need = True
     if need:
         try:
-            prices['models'] = fetch_prices()
+            # 只刷新 DeepSeek，保留其它模型的公开价/中转站参考价。
+            prices.setdefault('models', {}).update(fetch_prices())
             prices['fetched_at'] = today.strftime('%Y-%m-%d')
             print('[ttk] 价格已更新: %s' % prices['fetched_at'], file=sys.stderr)
         except Exception as e:
@@ -312,8 +420,10 @@ def parse_usage_line(o, prices, aliases, seen):
         return None
     prompt = int(ru.get('prompt_tokens') or 0)
     hit = int(ru.get('prompt_cache_hit_tokens') or 0)
-    miss = ru.get('prompt_cache_miss_tokens')
-    miss = int(miss) if miss is not None else max(prompt - hit, 0)
+    write = int(ru.get('prompt_cache_write_tokens') or 0)
+    # 部分网关把 cache write 排除在 prompt_cache_miss_tokens 外；直接用总输入
+    # 反推未命中，保证 hit + miss + write == prompt_tokens，不漏计上行。
+    miss = max(prompt - hit - write, 0)
     out = int(ru.get('completion_tokens') or 0)
     credit = float(ru.get('credit') or 0)
     model = pd.get('requestModelId') or pd.get('model') or 'unknown'
@@ -326,10 +436,44 @@ def parse_usage_line(o, prices, aliases, seen):
         'weekday': WEEK[dt.weekday()],
         'client': client,
         'model': model,
-        'hit': hit, 'miss': miss, 'out': out, 'credit': credit,
-        'hit_key': 'hit_' + b, 'miss_key': 'miss_' + b, 'out_key': 'out_' + b,
+        'hit': hit, 'miss': miss, 'write': write, 'out': out, 'credit': credit,
+        'hit_key': 'hit_' + b, 'miss_key': 'miss_' + b,
+        'write_key': 'write_' + b, 'out_key': 'out_' + b,
         'priced': model in aliases,
     }
+
+
+RESET_RE = re.compile(r'reset at (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})')
+
+
+def _err_text(o, err):
+    """把 429 的可读正文拼出来（message 优先，其次 content）。"""
+    txt = ''
+    if isinstance(err, dict):
+        txt = str(err.get('message') or '')
+    c = o.get('content')
+    if isinstance(c, list):
+        for x in c:
+            if isinstance(x, dict):
+                txt += str(x.get('text') or '')
+    elif isinstance(c, str):
+        txt += c
+    return txt
+
+
+def parse_reset_at(txt):
+    """从 429 正文里抠出官方给的重置时刻（本地时区字符串，不带 tz 后缀）。
+
+    网关原文：`429 usage exceeds frequency limit, ... your usage will reset at
+    2026-10-25 16:13:22 UTC+8, alternatively, you can switch to the other models`
+    """
+    m = RESET_RE.search(txt or '')
+    if not m:
+        return None
+    try:
+        return datetime.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        return None
 
 
 def count_429(o, days, seen, last_model):
@@ -340,6 +484,7 @@ def count_429(o, days, seen, last_model):
     pd = o.get('providerData') or {}
     err = pd.get('error') or {}
     is429 = err.get('status') == 429
+    txt = ''
     if not is429:
         # 兜底：assistant 失败且正文以 429 开头
         c = o.get('content')
@@ -352,6 +497,8 @@ def count_429(o, days, seen, last_model):
             txt = c
         if not (o.get('status') == 'incomplete' and txt.strip().startswith('429')):
             return None
+    else:
+        txt = _err_text(o, err)
     mid = o.get('id')
     if not mid:
         return None
@@ -372,6 +519,14 @@ def count_429(o, days, seen, last_model):
     e = d.setdefault('errors', {'total': 0, 'by_model': {}})
     e['total'] += 1
     e['by_model'][model] = e['by_model'].get(model, 0) + 1
+    # 事件明细：网关会给出确切的重置时刻，留着才能算「还要等多久」
+    reset = parse_reset_at(txt)
+    ev = e.setdefault('events', [])
+    ev.append({'at': dt.strftime('%Y-%m-%d %H:%M:%S'),
+               'model': model,
+               'reset_at': reset.strftime('%Y-%m-%d %H:%M:%S') if reset else None})
+    if len(ev) > 200:          # 防缓存膨胀，只留最近的
+        del ev[:-200]
     return model
 
 
@@ -380,24 +535,50 @@ def add_record(days, rec):
     bucket = d[rec['client']]
     bucket[rec['hit_key']] += rec['hit']
     bucket[rec['miss_key']] += rec['miss']
+    bucket[rec['write_key']] += rec['write']
     bucket[rec['out_key']] += rec['out']
     bucket['req'] += 1
     m = d['models'].setdefault(rec['model'], zero_bucket() | {'credit': 0.0})
     m[rec['hit_key']] += rec['hit']
     m[rec['miss_key']] += rec['miss']
+    m[rec['write_key']] += rec['write']
     m[rec['out_key']] += rec['out']
     m['req'] += 1
     m['credit'] += rec['credit']
 
 
-def model_cost(bucket, spec):
+def model_cost_breakdown(bucket, spec):
+    """返回可复算的逐项计价明细；价格单位均为 CNY / 百万 Token。"""
+    rows = []
     if not spec:
-        return 0.0
-    total = 0.0
-    for key, field in (('hit', 'hit'), ('miss', 'miss'), ('out', 'out')):
-        total += bucket.get(field + '_peak', 0) * spec[key]['peak'] / 1e6
-        total += bucket.get(field + '_off', 0) * spec[key]['off'] / 1e6
-    return total
+        return rows
+    for field in ('hit', 'miss', 'write', 'out'):
+        # 未单列缓存写入价的模型，写入按普通输入价估算。
+        price = spec.get(field)
+        if field == 'write' and not price:
+            price = spec.get('miss')
+        if not price:
+            continue
+        peak_tokens = bucket.get(field + '_peak', 0)
+        off_tokens = bucket.get(field + '_off', 0)
+        peak_cost = peak_tokens * price['peak'] / 1e6
+        off_cost = off_tokens * price['off'] / 1e6
+        rows.append({
+            'kind': field,
+            'tokens': peak_tokens + off_tokens,
+            'peak_tokens': peak_tokens,
+            'off_tokens': off_tokens,
+            'peak_price': price['peak'],
+            'off_price': price['off'],
+            'peak_cost': peak_cost,
+            'off_cost': off_cost,
+            'cost': peak_cost + off_cost,
+        })
+    return rows
+
+
+def model_cost(bucket, spec):
+    return sum(row['cost'] for row in model_cost_breakdown(bucket, spec))
 
 
 def load_membership():
@@ -407,15 +588,7 @@ def load_membership():
 
 
 def fee_usd_for(memb, day):
-    """返回 day 当天适用的月费（美元）：到 next_effective 之后切到新价。"""
-    nxt = memb.get('next_fee_usd')
-    eff = memb.get('next_effective')
-    if nxt and eff:
-        try:
-            if day >= datetime.date.fromisoformat(str(eff)):
-                return float(nxt)
-        except ValueError:
-            pass
+    """返回 day 当天适用的月费（美元）。"""
     return float(memb.get('monthly_fee_usd') or 0)
 
 
@@ -427,11 +600,13 @@ def day_cost(d, prices, aliases):
 
 
 def bucket_view(b):
-    hit = b['hit_peak'] + b['hit_off']
-    miss = b['miss_peak'] + b['miss_off']
-    out = b['out_peak'] + b['out_off']
-    return {'in': hit + miss, 'hit': hit, 'miss': miss, 'out': out,
-            'tokens': hit + miss + out, 'req': b['req']}
+    hit = b.get('hit_peak', 0) + b.get('hit_off', 0)
+    miss = b.get('miss_peak', 0) + b.get('miss_off', 0)
+    write = b.get('write_peak', 0) + b.get('write_off', 0)
+    out = b.get('out_peak', 0) + b.get('out_off', 0)
+    return {'in': hit + miss + write, 'hit': hit, 'miss': miss,
+            'write': write, 'out': out,
+            'tokens': hit + miss + write + out, 'req': b['req']}
 
 
 def projects_dir(override=None):
@@ -443,17 +618,79 @@ def projects_dir(override=None):
 
 
 def migrate_state(state):
-    """旧缓存（客户端键 cb/ccb）迁移到 terminal/popup，兼容历史 cache。"""
+    """兼容旧缓存的客户端键与新增 token 分项。"""
     for d in (state.get('days') or {}).values():
         for old, new in (('cb', 'terminal'), ('ccb', 'popup')):
             if old in d:
                 d.setdefault(new, d.pop(old))
+        buckets = [d.get('terminal', {}), d.get('popup', {})]
+        buckets += list((d.get('models') or {}).values())
+        for bucket in buckets:
+            for key in BUCKETS:
+                bucket.setdefault(key, 0)
     return state
+
+
+def pretty_model(mid):
+    """模型 id → 官方展示名：step-5-preview → Step-5-Preview（对齐客户端文案）。"""
+    if not mid:
+        return ''
+    return '-'.join(p[:1].upper() + p[1:] for p in str(mid).split('-'))
+
+
+def fmt_remain(sec):
+    """秒 → '5h02m' / '48m'，用于冷却倒计时。"""
+    sec = int(max(0, sec))
+    h, m = divmod(sec // 60, 60)
+    if h:
+        return '%dh%02dm' % (h, m)
+    return '%dm' % m
+
+
+def build_cooldowns(out_days, now):
+    """按渠道汇总最近一次 429 与官方重置时刻 → 冷却倒计时。
+
+    网关 429 正文带 `your usage will reset at YYYY-MM-DD HH:MM:SS UTC+8`，
+    直接用它算「还剩多久恢复」，比只知道「今天触发过」有用得多。
+    """
+    latest = {}
+    for od in out_days:
+        for ev in ((od.get('errors') or {}).get('events') or []):
+            g = group_of(ev.get('model')) or 'other'
+            prev = latest.get(g)
+            if not prev or ev['at'] > prev['at']:
+                latest[g] = ev
+    out = []
+    for g, ev in latest.items():
+        reset = ev.get('reset_at')
+        remain = None
+        active = False
+        if reset:
+            try:
+                rt = datetime.datetime.strptime(reset, '%Y-%m-%d %H:%M:%S').replace(tzinfo=TZ)
+                remain = int((rt - now).total_seconds())
+                active = remain > 0
+            except ValueError:
+                reset = None
+        if active:
+            others = [x for x, _ in FREE_GROUPS if x != g]
+            advice = ('先切 %s 继续' % '/'.join(others)) if others else '先歇一会'
+        else:
+            advice = None
+        out.append({'group': g, 'model': ev.get('model'),
+                    'model_label': pretty_model(ev.get('model')),
+                    'last429_at': ev['at'], 'reset_at': reset,
+                    'remain_sec': remain if active else 0,
+                    'remain': fmt_remain(remain) if active else None,
+                    'active': active, 'advice': advice})
+    out.sort(key=lambda x: (not x['active'], x['group']))
+    return out
 
 
 def build_report(days, prices, span, meta):
     aliases = alias_map(prices)
-    today = datetime.datetime.now(TZ).date()
+    now = datetime.datetime.now(TZ)
+    today = now.date()
     out_days = []
     for i in range(span - 1, -1, -1):
         dt = today - datetime.timedelta(days=i)
@@ -464,32 +701,51 @@ def build_report(days, prices, span, meta):
         models = []
         cost = 0.0
         credits = 0.0
+        unpriced_models = []
+        credit_unit_price = float(prices.get('credit_cny') or 0.05)
         for name, b in d['models'].items():
             spec = prices['models'].get(aliases.get(name, ''))
             c = model_cost(b, spec)
             v = bucket_view(b)
             cost += c
             credits += b.get('credit', 0.0)
+            if not spec and v['tokens']:
+                unpriced_models.append(name)
             models.append({'id': name, 'req': b['req'], 'tokens': v['tokens'],
-                           'in': v['in'], 'out': v['out'], 'cost': round(c, 4),
+                           'in': v['in'], 'hit': v['hit'], 'miss': v['miss'],
+                           'write': v['write'], 'out': v['out'], 'cost': round(c, 4),
+                           'priced': bool(spec),
+                           'price_unit': 'CNY_per_1m_tokens',
+                           'price_source': (spec or {}).get('source'),
+                           'breakdown': model_cost_breakdown(b, spec),
                            'credit': b.get('credit', 0.0)})
         models.sort(key=lambda x: (-x['tokens'], x['id']))
+        token_cost = round(cost, 4)
+        credit_cost = round(credits * credit_unit_price, 4)
+        total_cost = token_cost
         out_days.append({
             'date': key, 'weekday': WEEK[dt.weekday()],
             'terminal': terminal, 'popup': popup,
             'in': terminal['in'] + popup['in'],
             'hit': terminal['hit'] + popup['hit'],
             'miss': terminal['miss'] + popup['miss'],
+            'write': terminal['write'] + popup['write'],
             'out': terminal['out'] + popup['out'],
             'tokens': terminal['tokens'] + popup['tokens'],
             'req': terminal['req'] + popup['req'],
-            'cost': round(cost, 4), 'credits': round(credits, 2), 'models': models,
+            'token_cost': token_cost,
+            'credit_cost': credit_cost,
+            'cost': total_cost,
+            'credits': round(credits, 2),
+            'unpriced_models': sorted(unpriced_models),
+            'models': models,
         })
     # 免费/受限模型用量 + 渠道级 429 关联
     for od in out_days:
         d = days.get(od['date']) or day_skeleton()
         err = d.get('errors') or {'total': 0, 'by_model': {}}
-        od['errors'] = {'total': err['total'], 'by_model': dict(err.get('by_model', {}))}
+        od['errors'] = {'total': err['total'], 'by_model': dict(err.get('by_model', {})),
+                        'events': list(err.get('events') or [])}
         free = []
         for g, keys in FREE_GROUPS:
             req = 0
@@ -499,8 +755,10 @@ def build_report(days, prices, span, meta):
                 nl = name.lower()
                 if any(k in nl for k in keys):
                     req += b['req']
-                    tok += (b['hit_peak'] + b['hit_off'] + b['miss_peak']
-                            + b['miss_off'] + b['out_peak'] + b['out_off'])
+                    tok += (b.get('hit_peak', 0) + b.get('hit_off', 0)
+                            + b.get('miss_peak', 0) + b.get('miss_off', 0)
+                            + b.get('write_peak', 0) + b.get('write_off', 0)
+                            + b.get('out_peak', 0) + b.get('out_off', 0))
                     e429 += err.get('by_model', {}).get(name, 0)
             free.append({'group': g, 'req': req, 'tokens': tok, 'err429': e429})
         od['free_models'] = free
@@ -520,12 +778,9 @@ def build_report(days, prices, span, meta):
         m_req += v['req'] + w['req']
         m_tokens += v['tokens'] + w['tokens']
         m_days += 1
-    usd_cny = float(memb.get('usd_cny') or 7.15)
+    usd_cny = float(memb.get('usd_cny') or 6.714)
     fee_usd = fee_usd_for(memb, today)
     fee_cny = fee_usd * usd_cny
-    nxt_fee = memb.get('next_fee_usd')
-    nxt_eff = memb.get('next_effective')
-    show_next = bool(nxt_fee and nxt_eff and float(nxt_fee) != fee_usd)
     membership = {
         'plan': memb.get('plan') or 'WorkBuddy Pro',
         'month': month_key,
@@ -538,19 +793,27 @@ def build_report(days, prices, span, meta):
         'month_tokens': m_tokens,
         'month_req': m_req,
         'month_days': m_days,
-        'next_fee_usd': round(float(nxt_fee), 2) if show_next else None,
-        'next_effective': str(nxt_eff) if show_next else None,
         'note': memb.get('note'),
     }
+    credit_unit_price = float(prices.get('credit_cny') or 0.05)
+    tot_credits = sum(d['credits'] for d in out_days)
+    tot_token_cost = sum(d.get('token_cost', d['cost']) for d in out_days)
+    tot_credit_cost = round(tot_credits * credit_unit_price, 4)
+    tot_cost = round(tot_token_cost, 4)
+
     totals = {
         'days': span,
         'tokens': sum(d['tokens'] for d in out_days),
-        'cost': round(sum(d['cost'] for d in out_days), 4),
-        'credits': round(sum(d['credits'] for d in out_days), 2),
+        'token_cost': round(tot_token_cost, 4),
+        'credit_cost': tot_credit_cost,
+        'cost': tot_cost,
+        'credits': round(tot_credits, 2),
+        'credit_unit_price': credit_unit_price,
         'req': sum(d['req'] for d in out_days),
         'terminal_tokens': sum(d['terminal']['tokens'] for d in out_days),
         'popup_tokens': sum(d['popup']['tokens'] for d in out_days),
         'err429': sum(d['errors']['total'] for d in out_days),
+        'unpriced_models': sorted({m for d in out_days for m in d.get('unpriced_models', [])}),
     }
     rate_limit = {'total': 0, 'by_model': {}, 'by_group': {}}
     for od in out_days:
@@ -562,16 +825,19 @@ def build_report(days, prices, span, meta):
             rate_limit['by_group'][g] = rate_limit['by_group'].get(g, 0) + n
 
     limits, warn_ratio = load_limits()
+    cooldowns = build_cooldowns(out_days, now)
     today_w = out_days[-1] if out_days else {'free_models': [], 'errors': {'total': 0, 'by_model': {}}}
-    warnings, alert_level = compute_warnings(today_w, limits, warn_ratio)
+    warnings, alert_level = compute_warnings(today_w, limits, warn_ratio, cooldowns)
+    rate_limit['cooldown'] = [c for c in cooldowns if c['active']]
 
     return {
-        'generated_at': datetime.datetime.now(TZ).strftime('%Y-%m-%d %H:%M:%S'),
+        'generated_at': now.strftime('%Y-%m-%d %H:%M:%S'),
         'tz': 'UTC+8',
         'days': out_days,
         'today': out_days[-1] if out_days else None,
         'totals': totals,
         'rate_limit': rate_limit,
+        'cooldowns': cooldowns,
         'warnings': warnings,
         'alert_level': alert_level,
         'warn_ratio': warn_ratio,
@@ -580,8 +846,11 @@ def build_report(days, prices, span, meta):
         'membership': membership,
         'prices': {'source': prices.get('source'), 'fetched_at': prices.get('fetched_at'),
                    'currency': prices.get('currency', 'CNY'),
-                   'note': '高峰=工作日 9:00-12:00 / 14:00-18:00（北京时间），其余为空闲时段'},
+                   'basis': prices.get('pricing_basis', ''),
+                   'note': '费用按各模型输入/缓存/输出 Token 单价估算；单价统一取厂商官网刊例价（美元×7.15），不采用限时折扣/活动价/中转站价；DeepSeek 高峰=工作日 9:00-12:00 / 14:00-18:00（北京时间），积分不计入费用'},
         'meta': meta,
+        'signin': (check_signin_today() if check_signin_today else None),
+        'matrix': (load_json(REPORT, {}).get('matrix') if os.path.exists(REPORT) else None) or (refresh_matrix() if refresh_matrix else None),
     }
 
 
@@ -686,9 +955,15 @@ def scan(force=False, prices=None, quiet=False, projects=None):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(description='CodeBuddy Token & Matrix Tracker')
     ap.add_argument('--days', type=int, default=7)
-    ap.add_argument('--refresh', action='store_true')
+    ap.add_argument('--scan', action='store_true', help='执行会话 token 扫描（同默认）')
+    ap.add_argument('--refresh-matrix', action='store_true', help='刷新 6 通道账号矩阵与精准积分')
+    ap.add_argument('--signin', action='store_true', help='执行国内主号每日签到 (+100积分)')
+    ap.add_argument('--check-signin', action='store_true', help='检查今日签到状态')
+    ap.add_argument('--records', action='store_true', help='读取历史签到、巡检与扫描记录')
+    ap.add_argument('--all', action='store_true', help='执行全量：签到检查 + 矩阵刷新 + 会话扫描')
+    ap.add_argument('--refresh', action='store_true', help='丢弃 token 缓存，全量重扫')
     ap.add_argument('--update-prices', action='store_true')
     ap.add_argument('--json', action='store_true')
     ap.add_argument('--quiet', action='store_true')
@@ -696,20 +971,101 @@ def main():
                     help='CodeBuddy CLI 会话数据目录（等同环境变量 TTK_PROJECTS）')
     args = ap.parse_args()
 
+    # 1. 独立签到
+    if args.signin:
+        if do_signin:
+            res = do_signin()
+            rep = load_json(REPORT, None) or {}
+            rep['signin'] = check_signin_today() if check_signin_today else None
+            if refresh_matrix:
+                try:
+                    rep['matrix'] = refresh_matrix()
+                except Exception:
+                    pass
+            save_json(REPORT, rep)
+            if args.json:
+                print(json.dumps(res, ensure_ascii=False, indent=2))
+            elif not args.quiet:
+                print(f"[ttk] 签到结果: {res.get('message', '完成')} | 标记: {res.get('badge_text')}")
+        return
+
+    # 2. 仅检查签到
+    if args.check_signin:
+        res = check_signin_today() if check_signin_today else {}
+        if args.json:
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        elif not args.quiet:
+            print(f"[ttk] 今日签到状态: {res.get('badge_text')} ({res.get('msg')})")
+        return
+
+    # 3. 独立刷新矩阵与精准积分
+    if args.refresh_matrix:
+        if refresh_matrix:
+            m_data = refresh_matrix()
+            rep = load_json(REPORT, None) or {}
+            rep['matrix'] = m_data
+            rep['signin'] = check_signin_today() if check_signin_today else rep.get('signin')
+            rep['generated_at'] = m_data['updated_at']
+            save_json(REPORT, rep)
+            if args.json:
+                print(json.dumps(m_data, ensure_ascii=False, indent=2))
+            elif not args.quiet:
+                print(f"[ttk] 矩阵刷新完成: 6通道总积分 {m_data['total_credits']} 点 (更新于 {m_data['updated_at']})")
+        return
+
+    # 4. 读取运行记录
+    if args.records:
+        if get_records_summary:
+            rec_data = get_records_summary()
+            if args.json:
+                print(json.dumps(rec_data, ensure_ascii=False, indent=2))
+            elif not args.quiet:
+                print(f"[ttk] 历史记录: 签到 {len(rec_data.get('signin_history', []))} 条, 巡检 {len(rec_data.get('matrix_history', []))} 条")
+        return
+
+    # 5. 全量预检
+    if args.all:
+        if check_signin_today and do_signin:
+            st = check_signin_today()
+            if not st.get('today_checked'):
+                do_signin()
+        if refresh_matrix:
+            refresh_matrix()
+
+    # 默认/会话扫描逻辑
     prices = ensure_prices(update=args.update_prices)
     days, meta = scan(force=args.refresh, prices=prices, quiet=args.quiet,
                       projects=args.projects or None)
     report = build_report(days, prices, max(1, args.days), meta)
+    # 显式刷新时同步刷新账号矩阵，否则报告会一直沿用上次的旧额度
+    if refresh_matrix and (args.refresh or args.all):
+        try:
+            report['matrix'] = refresh_matrix()
+        except Exception:
+            pass
     save_json(REPORT, report)
+
+    t = report.get('today') or {}
+    if append_scan_record:
+        append_scan_record(meta, t.get('tokens', 0), t.get('cost', 0.0), t.get('credits', 0.0))
+
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     elif not args.quiet:
-        t = report['today']
-        print('[ttk] %s  tokens=%s  cost=%.2f CNY  req=%s  (+%s records, %sms)' % (
-            t['date'], f"{t['tokens']:,}", t['cost'], t['req'], meta['new_records'], meta['scan_ms']))
+        print('[ttk] %s  tokens=%s  est_cost=%.2f CNY  req=%s  (+%s records, %sms)' % (
+            t.get('date', '-'), f"{t.get('tokens', 0):,}", t.get('cost', 0.0), t.get('req', 0), meta['new_records'], meta['scan_ms']))
+        print('[ttk] 今日上下行：输入 %s tokens（命中 %s · 未命中 %s · 缓存写入 %s）· 输出 %s tokens' % (
+            f"{t.get('in', 0):,}", f"{t.get('hit', 0):,}", f"{t.get('miss', 0):,}",
+            f"{t.get('write', 0):,}", f"{t.get('out', 0):,}"))
         print('[ttk] 今日拆分：终端 %s tokens（%d 次）· 弹窗 %s tokens（%d 次）' % (
-            f"{t['terminal']['tokens']:,}", t['terminal']['req'],
-            f"{t['popup']['tokens']:,}", t['popup']['req']))
+            f"{t.get('terminal', {}).get('tokens', 0):,}", t.get('terminal', {}).get('req', 0),
+            f"{t.get('popup', {}).get('tokens', 0):,}", t.get('popup', {}).get('req', 0)))
+        if t.get('unpriced_models'):
+            print('[ttk] ⚠ 未配置 Token 单价：%s（这些模型不计入估算费用）' % ', '.join(t['unpriced_models']))
+        if report.get('matrix'):
+            print(f"[ttk] 6通道全矩阵资产：{report['matrix']['total_credits']} 点可用")
+        if report.get('signin'):
+            print(f"[ttk] 今日签到标记：{report['signin'].get('badge_text')}")
         rl = report.get('rate_limit') or {}
         if rl.get('total'):
             parts = ['%s %d' % (g, n) for g, n in sorted(rl.get('by_group', {}).items(), key=lambda x: -x[1])]
@@ -717,13 +1073,13 @@ def main():
         for w in report.get('warnings') or []:
             if not w['level']:
                 continue
-            if w['level'] == 2:
-                tag = '已触发 429 限流'
-            else:
-                tag = '接近免费额度上限'
+            tag = '已触发 429 限流' if w['level'] == 2 else '接近免费额度上限'
             print('[ttk] ⚠ %s %s：今日 %d 请求 / %s（阈值 %d 请求 / %s）' % (
                 w['group'], tag, w['req'], fmt_tok(w['tokens']),
                 w['threshold_req'], fmt_tok(w['threshold_tokens'])))
+            if w.get('cooldown') and w.get('remain'):
+                print('[ttk]    ↳ %s 使用量已超出频率限制，%s 重置后可用（还剩 %s）· 可先切换其他模型（硬挤会反复中断）' % (
+                    w.get('model_label') or w['group'], w.get('reset_at'), w['remain']))
 
 
 if __name__ == '__main__':

@@ -7,6 +7,12 @@ ttk.last.err.txt
 __pycache__/
 删除/
 
+# Runtime history / sign-in state (personal usage records)
+*_history.jsonl
+signin_state.json
+target6_credits.json
+_ttk.ps1.bak_*
+
 # Personal data: your subscription fee / FX rate.
 # See README.md for the membership.json template.
 membership.json

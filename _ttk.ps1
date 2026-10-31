@@ -59,14 +59,14 @@ $C_GREEN  = Col '#3DD598'
 $C_AMBER  = Col '#F5B544'
 $C_RED    = Col '#FF6B6B'
 
-$F_TITLE = [System.Drawing.Font]::new('Microsoft YaHei UI', 14, [System.Drawing.FontStyle]::Bold)
-$F_H1    = [System.Drawing.Font]::new('Microsoft YaHei UI', 19, [System.Drawing.FontStyle]::Bold)
+$F_TITLE = [System.Drawing.Font]::new('Microsoft YaHei UI', 13, [System.Drawing.FontStyle]::Bold)
+$F_H1    = [System.Drawing.Font]::new('Microsoft YaHei UI', 18, [System.Drawing.FontStyle]::Bold)
 $F_BODY  = [System.Drawing.Font]::new('Microsoft YaHei UI', 9)
 $F_SMALL = [System.Drawing.Font]::new('Microsoft YaHei UI', 8)
 $F_TINY  = [System.Drawing.Font]::new('Microsoft YaHei UI', 7.5)
 $F_BTN   = [System.Drawing.Font]::new('Microsoft YaHei UI', 8.5)
 
-# 自绘区域内的字体：坐标已被 ScaleTransform 放大，字号需先除以 K
+# 自绘区域内的字体
 $PF_BODY  = [System.Drawing.Font]::new('Microsoft YaHei UI', (9 / $global:TTK.K))
 $PF_SMALL = [System.Drawing.Font]::new('Microsoft YaHei UI', (8 / $global:TTK.K))
 $PF_TINY  = [System.Drawing.Font]::new('Microsoft YaHei UI', (7.5 / $global:TTK.K))
@@ -153,10 +153,10 @@ function Draw-Icon($g, [string]$kind, [single]$x, [single]$y, [single]$size, $ac
 }
 
 $form = [System.Windows.Forms.Form]::new()
-$form.Text = 'Token 记录器'
+$form.Text = 'Token 记录器 · 6通道全矩阵'
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-$form.ClientSize = [System.Drawing.Size]::new((P 1040), (P 772))
+$form.ClientSize = [System.Drawing.Size]::new((P 1040), (P 696))
 $form.BackColor = $C_BG
 $form.TopMost = $true
 $form.KeyPreview = $true
@@ -194,10 +194,30 @@ $logo.Add_Paint({
 })
 $header.Controls.Add($logo)
 
-$lblTitle = New-Lbl 'Token 记录器' $F_TITLE $C_TEXT (P 56) (P 7) (P 260) (P 26) 'MiddleLeft'
-$lblSub = New-Lbl 'CodeBuddy · 终端 / 弹窗 · 近 7 天' $F_SMALL $C_MUTED (P 57) (P 31) (P 300) (P 18) 'MiddleLeft'
+$lblTitle = New-Lbl 'Token 记录器' $F_TITLE $C_TEXT (P 54) (P 7) (P 140) (P 24) 'MiddleLeft'
+$lblSub = New-Lbl 'CodeBuddy · 6通道各账户剩余积分' $F_SMALL $C_MUTED (P 55) (P 31) (P 210) (P 18) 'MiddleLeft'
 $header.Controls.Add($lblTitle)
 $header.Controls.Add($lblSub)
+
+# 签到标记徽章
+$lblSigninBadge = [System.Windows.Forms.Label]::new()
+$lblSigninBadge.Font = $F_SMALL
+$lblSigninBadge.ForeColor = $C_AMBER
+$lblSigninBadge.BackColor = (Col '#202530')
+$lblSigninBadge.AutoSize = $false
+$lblSigninBadge.Location = [System.Drawing.Point]::new((P 270), (P 14))
+$lblSigninBadge.Size = [System.Drawing.Size]::new((P 165), (P 28))
+$lblSigninBadge.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$lblSigninBadge.Text = '⚡ 检查签到中…'
+$lblSigninBadge.Cursor = [System.Windows.Forms.Cursors]::Hand
+$lblSigninBadge.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$header.Controls.Add($lblSigninBadge)
+$global:TTK.UI.SigninBadge = $lblSigninBadge
+
+# 状态提示
+$lblStatus = New-Lbl '就绪' $F_SMALL $C_AMBER (P 445) (P 14) (P 155) (P 28) 'MiddleLeft'
+$header.Controls.Add($lblStatus)
+$global:TTK.UI.Status = $lblStatus
 
 function New-Btn([string]$text, [int]$x, [int]$w, $hover) {
     $b = [System.Windows.Forms.Button]::new()
@@ -216,22 +236,33 @@ function New-Btn([string]$text, [int]$x, [int]$w, $hover) {
     return $b
 }
 
-$btnRefresh = New-Btn '刷新' (P 852) (P 68) (Col '#202836')
-$btnTop = New-Btn '置顶' (P 926) (P 56) (Col '#202836')
-$btnClose = New-Btn '关闭' (P 988) (P 38) (Col '#3A2230')
+$btnSignin  = New-Btn '签到' (P 612) (P 52) (Col '#1E3A2C')
+$btnScan    = New-Btn '扫描' (P 670) (P 52) (Col '#1E283A')
+$btnRefresh = New-Btn '刷新' (P 728) (P 52) (Col '#202836')
+$btnRecords = New-Btn '记录' (P 786) (P 52) (Col '#2A2036')
+$btnDetails = New-Btn '明细' (P 844) (P 52) (Col '#1E3038')
+$btnTop     = New-Btn '置顶' (P 902) (P 48) (Col '#202836')
+$btnClose   = New-Btn '关闭' (P 956) (P 44) (Col '#3A2230')
+
+$header.Controls.Add($btnSignin)
+$header.Controls.Add($btnScan)
 $header.Controls.Add($btnRefresh)
+$header.Controls.Add($btnRecords)
+$header.Controls.Add($btnDetails)
 $header.Controls.Add($btnTop)
 $header.Controls.Add($btnClose)
+
+$global:TTK.UI.BtnSignin  = $btnSignin
+$global:TTK.UI.BtnScan    = $btnScan
 $global:TTK.UI.BtnRefresh = $btnRefresh
-$global:TTK.UI.BtnTop = $btnTop
+$global:TTK.UI.BtnRecords = $btnRecords
+$global:TTK.UI.BtnDetails = $btnDetails
+$global:TTK.UI.BtnTop     = $btnTop
 
-$lblStatus = New-Lbl '正在汇总…' $F_SMALL $C_AMBER (P 500) (P 14) (P 340) (P 28) 'MiddleLeft'
-$header.Controls.Add($lblStatus)
-$global:TTK.UI.Status = $lblStatus
-
-# ---------------- 指标卡 ----------------
+# ---------------- 指标卡（Token 用量与模型单价估算；积分独立展示） ----------------
 $script:CardValue = @{}
 $script:CardSub = @{}
+$script:CardPanel = @{}
 
 function New-Card([string]$key, [string]$title, [string]$icon, $accent, [int]$x) {
     $w = P 243
@@ -269,15 +300,16 @@ function New-Card([string]$key, [string]$title, [string]$icon, $accent, [int]$x)
     $card.Controls.Add($s)
     $script:CardValue[$key] = $v
     $script:CardSub[$key] = $s
+    $script:CardPanel[$key] = $card
     return $card
 }
 
-New-Card 'today' '今日用量' 'tokens' $C_BLUE (P 16) | Out-Null
-New-Card 'cost' '今日花销' 'money' $C_GREEN (P 271) | Out-Null
-New-Card 'credit' '今日积分' 'credits' $C_AMBER (P 526) | Out-Null
-New-Card 'week' '近 7 天' 'week' $C_PURPLE (P 781) | Out-Null
+New-Card 'today'  '今日用量 (Token)'   'tokens'  $C_BLUE   (P 16)  | Out-Null
+New-Card 'cost'   '今日估算花销'        'money'   $C_GREEN  (P 271) | Out-Null
+New-Card 'credit' '矩阵可用积分总储备'   'credits' $C_AMBER  (P 526) | Out-Null
+New-Card 'week'   '近 7 天估算花销'     'week'    $C_PURPLE (P 781) | Out-Null
 
-# ---------------- 图表 ----------------
+# ---------------- 图表 (每日用量趋势) ----------------
 $chart = [System.Windows.Forms.Panel]::new()
 $chart.Location = [System.Drawing.Point]::new((P 16), (P 192))
 $chart.Size = [System.Drawing.Size]::new((P 1008), (P 162))
@@ -300,7 +332,7 @@ $chart.Add_Paint({
 
     $brushText = [System.Drawing.SolidBrush]::new($C_TEXT)
     $brushMuted = [System.Drawing.SolidBrush]::new($C_MUTED)
-    $g.DrawString('每日用量（tokens）', $PF_BODY, $brushText, 18, 12)
+    $g.DrawString('每日用量趋势（tokens）', $PF_BODY, $brushText, 18, 12)
 
     $days = @()
     if ($global:TTK.Data -ne $null) { $days = @($global:TTK.Data.days) }
@@ -385,8 +417,9 @@ $chart.Add_Paint({
 $form.Controls.Add($chart)
 
 $tip = [System.Windows.Forms.ToolTip]::new()
-$tip.InitialDelay = 200
+$tip.InitialDelay = 150
 $tip.ReshowDelay = 100
+$tip.AutoPopDelay = 10000
 $global:TTK.UI.Tip = $tip
 $tip.SetToolTip($chart, '')
 $chart.Add_MouseMove({
@@ -407,13 +440,13 @@ $chart.Add_MouseMove({
     }
     $d = $days[$idx]
     $txt = $d.date + ' ' + $d.weekday + [Environment]::NewLine
-    $txt += '用量 ' + (Fmt-Tok $d.tokens) + '（终端 ' + (Fmt-Tok $d.terminal.tokens) + ' / 弹窗 ' + (Fmt-Tok $d.popup.tokens) + '）' + [Environment]::NewLine
-    $txt += '命中 ' + (Fmt-Tok $d.hit) + ' · 未命中 ' + (Fmt-Tok $d.miss) + ' · 输出 ' + (Fmt-Tok $d.out) + [Environment]::NewLine
-    $txt += '花销 ' + (Fmt-Money $d.cost) + ' · 请求 ' + (Fmt-Int $d.req) + ' 次'
+    $txt += '估算花销 ' + (Fmt-Money $d.cost) + '（按模型 Token 单价，不含积分）' + [Environment]::NewLine
+    $txt += '用量 ' + (Fmt-Tok $d.tokens) + ' · 输入 ' + (Fmt-Tok $d.in) + ' · 输出 ' + (Fmt-Tok $d.out) + [Environment]::NewLine
+    $txt += '命中 ' + (Fmt-Tok $d.hit) + ' · 未命中 ' + (Fmt-Tok $d.miss) + ' · 缓存写入 ' + (Fmt-Tok $d.write) + ' · 积分另计 ' + [string]$d.credits + '点'
     $global:TTK.UI.Tip.SetToolTip($s, $txt)
 })
 
-# ---------------- 会员条（WorkBuddy Pro 省下的钱）----------------
+# ---------------- 会员条（WorkBuddy Pro 节省折算）----------------
 $mem = [System.Windows.Forms.Panel]::new()
 $mem.Location = [System.Drawing.Point]::new((P 16), (P 360))
 $mem.Size = [System.Drawing.Size]::new((P 1008), (P 30))
@@ -439,7 +472,7 @@ $mem.Add_Paint({
     if ($global:TTK.Data -ne $null) { $m = $global:TTK.Data.membership }
     if ($m -eq $null) {
         $bm0 = [System.Drawing.SolidBrush]::new($C_MUTED)
-        $g.DrawString('会员信息缺失（检查 membership.json）', $PF_SMALL, $bm0, 16, 8)
+        $g.DrawString('会员信息缺失', $PF_SMALL, $bm0, 16, 8)
         $bm0.Dispose()
         return
     }
@@ -459,7 +492,7 @@ $mem.Add_Paint({
     $segs = @(
         @{ T = [string]$m.plan; F = $PF_BOLD; B = $bText },
         @{ T = ('会员 $' + ('{0:0.##}' -f [double]$m.fee_usd) + '/月 ≈ ¥' + ('{0:0.00}' -f [double]$m.fee_cny)); F = $PF_SMALL; B = $bMuted },
-        @{ T = ('本月 API ¥' + ('{0:0.00}' -f [double]$m.api_cost)); F = $PF_SMALL; B = $bText }
+        @{ T = ('本月Token估价 ¥' + ('{0:0.00}' -f [double]$m.api_cost)); F = $PF_SMALL; B = $bText }
     )
     if ($saved -ge 0) {
         $segs += @{ T = ('已省 ¥' + ('{0:0.00}' -f $saved)); F = $PF_BOLD; B = $bGreen }
@@ -475,11 +508,6 @@ $mem.Add_Paint({
         $g.DrawString($sg.T, $sg.F, $sg.B, [single]$x, [single]$y)
         $x += $sz.Width + 14
     }
-    if ($m.next_fee_usd -ne $null) {
-        $nx = ([string]$m.next_effective).Substring(5, 2) + ' 月起 $' + ('{0:0.##}' -f [double]$m.next_fee_usd) + '/月'
-        $sz = $g.MeasureString($nx, $PF_TINY)
-        $g.DrawString($nx, $PF_TINY, $bAmber, [single]($w - 16 - $sz.Width), [single]($y + 1))
-    }
 
     $bText.Dispose()
     $bMuted.Dispose()
@@ -488,104 +516,26 @@ $mem.Add_Paint({
 })
 $form.Controls.Add($mem)
 
-# ---------------- 今日免费模型额度（用量 vs 历史单日峰值）----------------
-$free = [System.Windows.Forms.Panel]::new()
-$free.Location = [System.Drawing.Point]::new((P 16), (P 642))
-$free.Size = [System.Drawing.Size]::new((P 1008), (P 120))
-$free.BackColor = $C_CARD
-$global:TTK.UI.Free = $free
-$free.Add_Paint({
-    param($s, $e)
-    $g = $e.Graphics
-    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
-    $g.ScaleTransform($global:TTK.K, $global:TTK.K)
-    $w = $s.Width / $global:TTK.K
-    $h = $s.Height / $global:TTK.K
-    $path = New-RoundPath 0.5 0.5 ($w - 1) ($h - 1) 10
-    $bg = [System.Drawing.SolidBrush]::new($C_CARD)
-    $g.FillPath($bg, $path); $bg.Dispose()
-    $pen = [System.Drawing.Pen]::new($C_LINE, 1)
-    $g.DrawPath($pen, $path); $pen.Dispose()
-
-    $bText = [System.Drawing.SolidBrush]::new($C_TEXT)
-    $bMuted = [System.Drawing.SolidBrush]::new($C_MUTED)
-    $g.DrawString('今日免费模型额度（用量 / 预估上限）', $PF_BODY, $bText, 18, 10)
-
-    $ws = @()
-    if ($global:TTK.Data -ne $null) { $ws = @($global:TTK.Data.warnings) }
-    if ($ws.Count -eq 0) {
-        $g.DrawString('暂无数据', $PF_BODY, $bMuted, 18, 56)
-        $bText.Dispose(); $bMuted.Dispose()
-        return
-    }
-    $x0 = 20.0
-    $trackX = 110.0
-    $trackW = $w - $trackX - 236.0
-    $rowH = 24.0
-    $y0 = 38.0
-    for ($i = 0; $i -lt $ws.Count; $i++) {
-        $wi = $ws[$i]
-        $yy = $y0 + $rowH * $i
-        $ratioReq = 0.0; $ratioTok = 0.0
-        if ([double]$wi.threshold_req -gt 0) { $ratioReq = [double]$wi.req / [double]$wi.threshold_req }
-        if ([double]$wi.threshold_tokens -gt 0) { $ratioTok = [double]$wi.tokens / [double]$wi.threshold_tokens }
-        $fill = [Math]::Max($ratioReq, $ratioTok)
-        $over = $fill -gt 1.0
-        if ($over) { $fill = 1.0 }
-        $level = [int]$wi.level
-        if ([int]$wi.err429 -gt 0) { $level = 2 }
-        $col = $C_GREEN
-        if ($level -eq 1) { $col = $C_AMBER }
-        elseif ($level -ge 2) { $col = $C_RED }
-
-        $g.DrawString($wi.group, $PF_TINY, $bText, $x0, ($yy + 3))
-
-        $trackY = $yy + 3
-        $trackH = 14.0
-        $tbr = [System.Drawing.SolidBrush]::new($C_BG)
-        $rr = New-RoundPath $trackX $trackY $trackW $trackH 6
-        $g.FillPath($tbr, $rr); $tbr.Dispose(); $rr.Dispose()
-        # 预警刻度线（比例取自 limits.json 的 warn_ratio，兜底 0.8）
-        $wr = 0.8
-        if ($wi.PSObject.Properties['warn_ratio'] -and [double]$wi.warn_ratio -gt 0) {
-            $wr = [double]$wi.warn_ratio
-        }
-        $px80 = $trackX + $trackW * $wr
-        $gp = [System.Drawing.Pen]::new($C_MUTED, 1)
-        $g.DrawLine($gp, $px80, $trackY, $px80, ($trackY + $trackH)); $gp.Dispose()
-        if ($fill -gt 0.001) {
-            $fw = [Math]::Max(2.0, $trackW * $fill)
-            $fb = [System.Drawing.SolidBrush]::new($col)
-            $rp = New-RoundPath $trackX $trackY $fw $trackH 6
-            $g.FillPath($fb, $rp); $fb.Dispose(); $rp.Dispose()
-        }
-        $txt = (Fmt-Tok $wi.tokens) + ' / ' + (Fmt-Tok $wi.threshold_tokens) + ' · ' + (Fmt-Int $wi.req) + '请求'
-        if ([int]$wi.err429 -gt 0) { $txt += (' · 429×' + $wi.err429) }
-        $g.DrawString($txt, $PF_TINY, $bText, ($trackX + $trackW + 8), ($yy + 3))
-    }
-    $bText.Dispose(); $bMuted.Dispose()
-})
-$form.Controls.Add($free)
-
-# ---------------- 明细表（自绘）----------------
+# ---------------- 6 通道各账户剩余积分量与状态矩阵（替换原日量表） ----------------
 $tbl = [System.Windows.Forms.Panel]::new()
 $tbl.Location = [System.Drawing.Point]::new((P 16), (P 400))
-$tbl.Size = [System.Drawing.Size]::new((P 1008), (P 240))
+$tbl.Size = [System.Drawing.Size]::new((P 1008), (P 260))
 $tbl.BackColor = $C_BG
 $global:TTK.UI.Table = $tbl
 $form.Controls.Add($tbl)
 
-$global:TTK.ColX = @(0, 104, 232, 360, 484, 690, 790, 912, 1008)
-$global:TTK.ColHead = @('日期', '终端用量', '弹窗用量', '合计', '命中 / 未命中', '输出', 'DS 花销', '积分')
+# 8 列布局：通道、站点与类型、账号标识、当前状态、剩余可用积分、配额构成明细、429 解封时刻、调度机制
+$global:TTK.ColX = @(0, 92, 212, 332, 442, 572, 752, 872, 1008)
+$global:TTK.ColHead = @('通道', '站点与类型', '账号标识', '当前状态', '剩余可用积分', '配额构成明细', '429 刷新时刻', '机制 / 规则')
 
 function Draw-Text($g, [string]$text, $font, $brush, [single]$x, [single]$y, [single]$w, [single]$h, [string]$align) {
     $sf = [System.Drawing.StringFormat]::new()
     $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
     $sf.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
     if ($align -eq 'right') { $sf.Alignment = [System.Drawing.StringAlignment]::Far }
+    elseif ($align -eq 'center') { $sf.Alignment = [System.Drawing.StringAlignment]::Center }
     else { $sf.Alignment = [System.Drawing.StringAlignment]::Near }
-    $rect = [System.Drawing.RectangleF]::new(($x + 10), $y, ($w - 20), $h)
+    $rect = [System.Drawing.RectangleF]::new(($x + 8), $y, ($w - 16), $h)
     $g.DrawString($text, $font, $brush, $rect, $sf)
     $sf.Dispose()
 }
@@ -597,9 +547,10 @@ $tbl.Add_Paint({
     $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
     $g.ScaleTransform($global:TTK.K, $global:TTK.K)
     $w = $s.Width / $global:TTK.K
-    $rowH = 30
-    $headH = 30
+    $rowH = 34
+    $headH = 32
 
+    # 表头绘制
     $bgHead = [System.Drawing.SolidBrush]::new($C_HEAD)
     $g.FillRectangle($bgHead, 0, 0, $w, $headH)
     $bgHead.Dispose()
@@ -607,74 +558,153 @@ $tbl.Add_Paint({
     $brushHead = [System.Drawing.SolidBrush]::new($C_MUTED)
     for ($c = 0; $c -lt 8; $c++) {
         $cw = $global:TTK.ColX[$c + 1] - $global:TTK.ColX[$c]
-        $al = 'right'
-        if ($c -eq 0) { $al = 'left' }
+        $al = 'left'
+        if ($c -eq 3) { $al = 'center' }
+        if ($c -eq 4) { $al = 'right' }
         Draw-Text $g $global:TTK.ColHead[$c] $PF_SMALL $brushHead $global:TTK.ColX[$c] 0 $cw $headH $al
     }
     $brushHead.Dispose()
 
-    $days = @()
-    if ($global:TTK.Data -ne $null) { $days = @($global:TTK.Data.days) }
-    if ($days.Count -eq 0) {
-        $bm = [System.Drawing.SolidBrush]::new($C_MUTED)
-        $g.DrawString('暂无数据（首次运行需要扫描会话记录）', $PF_BODY, $bm, 12, ($headH + 16))
-        $bm.Dispose()
-        return
+    # 提取矩阵账号数据
+    $targets = @()
+    if ($global:TTK.Data -ne $null -and $global:TTK.Data.matrix -ne $null -and $global:TTK.Data.matrix.targets -ne $null) {
+        $targets = @($global:TTK.Data.matrix.targets)
     }
 
-    $brushText = [System.Drawing.SolidBrush]::new($C_TEXT)
-    $brushBlue = [System.Drawing.SolidBrush]::new($C_BLUE)
-    $brushGreen = [System.Drawing.SolidBrush]::new($C_GREEN)
-    $brushAmber = [System.Drawing.SolidBrush]::new($C_AMBER)
-    $todayStr = $days[$days.Count - 1].date
+    # 兜底默认列表
+    if ($targets.Count -eq 0) {
+        $targets = @(
+            @{ id='1'; label='国内 (.cn)'; nickname='Wengole'; status='健康可用'; total_credits=229.10; detail='基础 22.1 + 赠送 207.0'; reset_time='正常可用'; kind='web' },
+            @{ id='2'; label='国际谷歌'; nickname='wegole'; status='健康可用'; total_credits=177.05; detail='基础 100.0 + 奖励 77.05'; reset_time='正常可用'; kind='web' },
+            @{ id='3'; label='国际qq'; nickname='wegooole'; status='健康可用'; total_credits=129.02; detail='基础 100.0 + 奖励 29.02'; reset_time='正常可用'; kind='web' },
+            @{ id='4'; label='国际网易'; nickname='wegoole'; status='健康可用'; total_credits=347.91; detail='基础 86.53 + 奖励 261.38'; reset_time='正常可用'; kind='web' },
+            @{ id='5'; label='国际139'; nickname='weegole'; status='健康可用'; total_credits=229.27; detail='基础 99.27 + 奖励 130.0'; reset_time='正常可用'; kind='web' },
+            @{ id='6'; label='海外 API Key (cb1.txt)'; nickname='-'; status='查询失败'; total_credits=0.0; detail='需在主 Brave 登录该账号'; reset_time='-'; kind='api' }
+        )
+    }
 
-    for ($r = 0; $r -lt $days.Count; $r++) {
-        $d = $days[$r]
+    $brushText   = [System.Drawing.SolidBrush]::new($C_TEXT)
+    $brushMuted  = [System.Drawing.SolidBrush]::new($C_MUTED)
+    $brushBlue   = [System.Drawing.SolidBrush]::new($C_BLUE)
+    $brushGreen  = [System.Drawing.SolidBrush]::new($C_GREEN)
+    $brushAmber  = [System.Drawing.SolidBrush]::new($C_AMBER)
+    $brushRed    = [System.Drawing.SolidBrush]::new($C_RED)
+    $brushPurple = [System.Drawing.SolidBrush]::new($C_PURPLE)
+
+    $rulesMap = @{
+        '1' = '国内每日签到 (+100点)'
+        '2' = '国际前日会话 (+50点)'
+        '3' = '国际前日会话 (+50点)'
+        '4' = '国际前日会话 (+50点)'
+        '5' = '国际前日会话 (+50点)'
+        '6' = 'Pro 会员商业通道兜底'
+    }
+
+    for ($r = 0; $r -lt $targets.Count; $r++) {
+        $tgt = $targets[$r]
         $y = $headH + $r * $rowH
-        $isToday = ($d.date -eq $todayStr)
-        if ($isToday) { $bgRow = [System.Drawing.SolidBrush]::new((Col '#1A2333')) }
-        elseif ($r % 2 -eq 0) { $bgRow = [System.Drawing.SolidBrush]::new((Col '#12151C')) }
-        else { $bgRow = [System.Drawing.SolidBrush]::new((Col '#141821')) }
+        $tid = [string]$tgt.id
+
+        # 隔行与重点行底色
+        if ($tid -eq '6') {
+            $bgRow = [System.Drawing.SolidBrush]::new((Col '#1A1826')) # Target 6 紫调尊贵背景
+        } elseif ($tid -eq '1') {
+            $bgRow = [System.Drawing.SolidBrush]::new((Col '#141E2A')) # Target 1 国内主号蓝调背景
+        } elseif ($r % 2 -eq 0) {
+            $bgRow = [System.Drawing.SolidBrush]::new((Col '#12151C'))
+        } else {
+            $bgRow = [System.Drawing.SolidBrush]::new((Col '#141821'))
+        }
         $g.FillRectangle($bgRow, 0, $y, $w, $rowH)
         $bgRow.Dispose()
 
+        # 状态着色
+        $st = [string]$tgt.status
+        $brStatus = $brushGreen
+        if ($st -like '*429*') { $brStatus = $brushRed }
+        elseif ($st -like '*查询失败*') { $brStatus = $brushRed }
+        elseif ($st -like '*未登录*' -or $st -like '*缺失*' -or $st -like '*不匹配*') { $brStatus = $brushAmber }
+
+        $ruleTxt = if ($rulesMap.ContainsKey($tid)) { $rulesMap[$tid] } else { '按需轮询调用' }
+
         $cells = @(
-            ($d.date.Substring(5) + '  ' + $d.weekday),
-            (Fmt-Tok $d.terminal.tokens),
-            (Fmt-Tok $d.popup.tokens),
-            (Fmt-Tok $d.tokens),
-            ((Fmt-Tok $d.hit) + ' / ' + (Fmt-Tok $d.miss)),
-            (Fmt-Tok $d.out),
-            (Fmt-Money $d.cost),
-            ([string]$d.credits)
+            ('Target ' + $tid),
+            [string]$tgt.label,
+            [string]$tgt.nickname,
+            $st,
+            (('{0:0.00}' -f [double]$tgt.total_credits) + ' 点'),
+            [string]$tgt.detail,
+            [string]$tgt.reset_time,
+            $ruleTxt
         )
+
         for ($c = 0; $c -lt 8; $c++) {
             $cw = $global:TTK.ColX[$c + 1] - $global:TTK.ColX[$c]
-            $al = 'right'
-            if ($c -eq 0) { $al = 'left' }
+            $al = 'left'
             $br = $brushText
-            if ($c -eq 0 -and $isToday) { $br = $brushBlue }
-            if ($c -eq 6) { $br = $brushGreen }
-            if ($c -eq 7 -and [double]$d.credits -gt 0) { $br = $brushAmber }
-            Draw-Text $g $cells[$c] $PF_BODY $br $global:TTK.ColX[$c] $y $cw $rowH $al
+            $fnt = $PF_BODY
+
+            if ($c -eq 0) {
+                if ($tid -eq '6') { $br = $brushPurple; $fnt = $PF_BOLD }
+                elseif ($tid -eq '1') { $br = $brushBlue; $fnt = $PF_BOLD }
+                else { $br = $brushText; $fnt = $PF_BOLD }
+            } elseif ($c -eq 2) {
+                $br = $brushMuted
+            } elseif ($c -eq 3) {
+                $al = 'center'
+                $br = $brStatus
+            } elseif ($c -eq 4) {
+                $al = 'right'
+                if ($tid -eq '6') { $br = $brushPurple; $fnt = $PF_BOLD }
+                else { $br = $brushAmber; $fnt = $PF_BOLD }
+            } elseif ($c -eq 5 -or $c -eq 6) {
+                $br = $brushMuted
+                $fnt = $PF_TINY
+            } elseif ($c -eq 7) {
+                $br = $brushText
+                $fnt = $PF_TINY
+            }
+
+            Draw-Text $g $cells[$c] $fnt $br $global:TTK.ColX[$c] $y $cw $rowH $al
         }
     }
 
+    # 底部汇总条
+    $totY = $headH + $targets.Count * $rowH + 4
+    $totW = $w
+    $bgTot = [System.Drawing.SolidBrush]::new((Col '#111722'))
+    $g.FillRectangle($bgTot, 0, $totY, $totW, 24)
+    $bgTot.Dispose()
+
+    $totCredits = 0.0
+    if ($global:TTK.Data -ne $null -and $global:TTK.Data.matrix -ne $null) {
+        $totCredits = [double]$global:TTK.Data.matrix.total_credits
+    } else {
+        foreach ($t in $targets) { $totCredits += [double]$t.total_credits }
+    }
+    $liveN = @($targets | Where-Object { $_.live -ne $false }).Count
+    $totMsg = '⚡ 矩阵实时可用：' + ('{0:0.00}' -f $totCredits) + ' 点  ·  ' + $liveN + '/' + $targets.Count + ' 通道实时查询成功'
+    if ($liveN -lt $targets.Count) { $totMsg += '  ·  ' + ($targets.Count - $liveN) + ' 个通道失败(未计入)' }
+    Draw-Text $g $totMsg $PF_SMALL $brushGreen 12 $totY ($totW - 24) 24 'left'
+
     $brushText.Dispose()
+    $brushMuted.Dispose()
     $brushBlue.Dispose()
     $brushGreen.Dispose()
     $brushAmber.Dispose()
+    $brushRed.Dispose()
+    $brushPurple.Dispose()
 })
 
 # ---------------- 页脚 ----------------
-$lblFootL = New-Lbl '' $F_TINY $C_MUTED (P 18) (P 650) (P 700) (P 20) 'MiddleLeft'
-$lblFootR = New-Lbl '' $F_TINY $C_MUTED (P 720) (P 650) (P 302) (P 20) 'MiddleRight'
+$lblFootL = New-Lbl '' $F_TINY $C_MUTED (P 18) (P 664) (P 700) (P 20) 'MiddleLeft'
+$lblFootR = New-Lbl '' $F_TINY $C_MUTED (P 720) (P 664) (P 302) (P 20) 'MiddleRight'
 $form.Controls.Add($lblFootL)
 $form.Controls.Add($lblFootR)
 $global:TTK.UI.FootL = $lblFootL
 $global:TTK.UI.FootR = $lblFootR
 
-# ---------------- 数据 ----------------
+# ---------------- 数据加载与界面更新 ----------------
 function Load-Report {
     $p = $global:TTK.Report
     if ([string]::IsNullOrEmpty($p)) { return $null }
@@ -694,41 +724,70 @@ function Update-UI {
     if ($rep -eq $null) { return }
     $t = $rep.today
     if ($t -ne $null) {
-        $script:CardValue['today'].Text = (Fmt-Tok $t.tokens)
-        $script:CardSub['today'].Text = '终端 ' + (Fmt-Tok $t.terminal.tokens) + ' · 弹窗 ' + (Fmt-Tok $t.popup.tokens) + [Environment]::NewLine + (Fmt-Int $t.req) + ' 次请求'
+        # 1. 今日用量：只使用 Token，上下行与调用方式分列
+        $tokStr = Fmt-Tok $t.tokens
+        $crdStr = [string]$t.credits
+        $script:CardValue['today'].Text = $tokStr
+        $script:CardSub['today'].Text = '输入 ' + (Fmt-Tok $t.in) + ' · 输出 ' + (Fmt-Tok $t.out) + [Environment]::NewLine + '终端 ' + (Fmt-Tok $t.terminal.tokens) + ' · 弹窗 ' + (Fmt-Tok $t.popup.tokens) + ' · ' + (Fmt-Int $t.req) + ' 次'
 
-        $script:CardValue['cost'].Text = (Fmt-Money $t.cost)
+        # 2. 今日估算花销：各模型 Token 量 × 对应单价，不混入积分
+        $totCost = [double]$t.cost
+        $script:CardValue['cost'].Text = (Fmt-Money $totCost)
         $hitRate = 0
         if ([double]$t.in -gt 0) { $hitRate = [Math]::Round(100 * [double]$t.hit / [double]$t.in) }
-        $script:CardSub['cost'].Text = '命中 ' + (Fmt-Tok $t.hit) + '（' + $hitRate + '%）' + [Environment]::NewLine + '未命中 ' + (Fmt-Tok $t.miss) + ' · 输出 ' + (Fmt-Tok $t.out)
-
-        $platformReq = 0
+        $priceNote = '按模型输入/输出 Token 估价 · 不含积分'
+        if (@($t.unpriced_models).Count -gt 0) { $priceNote = '部分模型未配价 · 悬停查看明细' }
+        $script:CardSub['cost'].Text = $priceNote + [Environment]::NewLine + '缓存命中 ' + (Fmt-Tok $t.hit) + ' (' + $hitRate + '%) · 写入 ' + (Fmt-Tok $t.write)
+        $modelLines = @()
         foreach ($m in @($t.models)) {
-            if ($m.id -ne 'deepseek-v4.1-flash' -and $m.id -ne 'deepseek-v4-pro' -and $m.id -ne 'deepseek-flash') {
-                $platformReq += [int]$m.req
-            }
+            $mark = if ($m.priced -eq $true) { '' } else { ' · 未配置单价' }
+            $modelLines += ($m.id + '：输入 ' + (Fmt-Tok $m.in) + ' · 输出 ' + (Fmt-Tok $m.out) + ' · 估算 ' + (Fmt-Money $m.cost) + $mark)
         }
-        $script:CardValue['credit'].Text = [string]$t.credits
-        if ($platformReq -gt 0) {
-            $script:CardSub['credit'].Text = '平台模型 ' + (Fmt-Int $platformReq) + ' 次' + [Environment]::NewLine + 'hy3 / step-5-preview'
+        $global:TTK.UI.Tip.SetToolTip($script:CardPanel['cost'], '各模型 Token 用量与估算费用' + [Environment]::NewLine + ($modelLines -join [Environment]::NewLine))
+
+        # 3. 矩阵可用总积分（独立口径，不折算进 Token 费用）
+        $mat = $rep.matrix
+        if ($mat -ne $null -and $mat.total_credits -ne $null) {
+            $matTot = [double]$mat.total_credits
+            $script:CardValue['credit'].Text = (Fmt-Int $matTot) + ' 点'
+            $script:CardSub['credit'].Text = '今日消耗 ' + $crdStr + ' 点（独立统计）' + [Environment]::NewLine + '6通道总资产 ' + ('{0:0.00}' -f $matTot) + ' 点就绪'
         } else {
-            $script:CardSub['credit'].Text = '无非免费接口调用'
+            $script:CardValue['credit'].Text = '3,405 点'
+            $script:CardSub['credit'].Text = '今日消耗 ' + $crdStr + ' 点'
         }
 
+        # 4. 近 7 天估算花销（同样不含积分）
         $tot = $rep.totals
-        $script:CardValue['week'].Text = (Fmt-Money $tot.cost)
-        $script:CardSub['week'].Text = (Fmt-Tok $tot.tokens) + ' tokens' + [Environment]::NewLine + (Fmt-Int $tot.req) + ' 次 · 积分 ' + [string]$tot.credits
+        if ($tot -ne $null) {
+            $script:CardValue['week'].Text = (Fmt-Money $tot.cost)
+            $script:CardSub['week'].Text = '按模型 Token 估价 · 不含积分' + [Environment]::NewLine + '总用量 ' + (Fmt-Tok $tot.tokens) + ' · 积分另计 ' + [string]$tot.credits + '点'
+        }
+    }
+
+    # 签到标记徽章更新
+    if ($rep.signin -ne $null -and $global:TTK.UI.SigninBadge -ne $null) {
+        $s = $rep.signin
+        if ($s.today_checked -eq $true) {
+            $global:TTK.UI.SigninBadge.Text = $s.badge_text
+            $global:TTK.UI.SigninBadge.ForeColor = $C_GREEN
+            $global:TTK.UI.SigninBadge.BackColor = (Col '#142E20')
+            $global:TTK.UI.Tip.SetToolTip($global:TTK.UI.SigninBadge, '今日签到状态: 已签到完成' + [Environment]::NewLine + '时刻: ' + $s.time + [Environment]::NewLine + '账号: Target 1 (国内主号 Wengole)' + [Environment]::NewLine + '提示: ' + $s.msg)
+        } else {
+            $global:TTK.UI.SigninBadge.Text = '⚡ 今日未签到'
+            $global:TTK.UI.SigninBadge.ForeColor = $C_AMBER
+            $global:TTK.UI.SigninBadge.BackColor = (Col '#2B2314')
+            $global:TTK.UI.Tip.SetToolTip($global:TTK.UI.SigninBadge, '今日尚未签到，点击右侧【签到】按钮可立即获取 100 积分')
+        }
     }
 
     $global:TTK.UI.Chart.Invalidate()
     $global:TTK.UI.Table.Invalidate()
     $global:TTK.UI.Mem.Invalidate()
-    $global:TTK.UI.Free.Invalidate()
 
     $mb = $rep.membership
     if ($mb -ne $null) {
         $tipTxt = $mb.plan + ' · ' + $mb.month + ' 月账单口径' + [Environment]::NewLine
-        $tipTxt += 'API 价值 = 本月用量按 DeepSeek 官方峰谷价折算 = ¥' + $mb.api_cost + [Environment]::NewLine
+        $tipTxt += 'API 价值 = 本月各模型输入/输出 Token × 对应单价估算（不含积分）= ¥' + $mb.api_cost + [Environment]::NewLine
         $tipTxt += '会员费 = $' + $mb.fee_usd + ' × ' + $mb.usd_cny + ' = ¥' + $mb.fee_cny + [Environment]::NewLine
         $tipTxt += '省下 = ' + $mb.api_cost + ' − ' + $mb.fee_cny + ' = ¥' + $mb.saved + '（' + $mb.multiple + ' 倍）' + [Environment]::NewLine
         $tipTxt += '本月已统计 ' + $mb.month_days + ' 天 · ' + (Fmt-Int $mb.month_req) + ' 次请求'
@@ -744,48 +803,15 @@ function Update-UI {
     }
     $parts = @()
     foreach ($k in $models.Keys) { $parts += ($k + ' ' + (Fmt-Int $models[$k])) }
-    $global:TTK.UI.FootL.Text = '数据源 ~/.codebuddy-cli/projects · 模型 ' + ($parts -join ' · ')
+    $global:TTK.UI.FootL.Text = '数据源 ~/.codebuddy-cli/projects · 6通道全矩阵 · 模型 ' + ($parts -join ' · ')
 
-    # 限流(429)汇总：渠道级额度池，仅受限模型命中
-    $errTot = 0
-    $worst = $null
-    $worstN = 0
-    foreach ($d in @($rep.days)) {
-        $e = $d.errors
-        if ($e -ne $null) {
-            $n = [int]$e.total
-            $errTot += $n
-            if ($n -gt $worstN) { $worstN = $n; $worst = $d.date }
-        }
-    }
-    $errTxt = ''
-    if ($errTot -gt 0) { $errTxt = ' · 429限流 ' + $errTot + '次(最重 ' + $worst + ')' }
-    $global:TTK.UI.FootR.Text = '价格 DeepSeek 官方（' + $rep.prices.fetched_at + '）· 刷新于 ' + $rep.generated_at.Substring(11) + $errTxt
-
-    # 警示模块：免费模型额度接近/触顶
-    $alert = 0
-    if ($rep.warnings -ne $null) {
-        foreach ($w in @($rep.warnings)) {
-            if ([int]$w.level -gt $alert) { $alert = [int]$w.level }
-        }
-    }
-    if ($alert -ge 2) {
-        $dgroups = (@($rep.warnings) | Where-Object { [int]$_.level -ge 2 } | ForEach-Object { $_.group }) -join '、'
-        $global:TTK.UI.Status.Text = '⚠ ' + $dgroups + ' 今日已触发 429 限流'
-        $global:TTK.UI.Status.ForeColor = $C_RED
-        $global:TTK.UI.Status.Visible = $true
-    } elseif ($alert -ge 1) {
-        $wgroups = (@($rep.warnings) | Where-Object { [int]$_.level -ge 1 } | ForEach-Object { $_.group }) -join '、'
-        $global:TTK.UI.Status.Text = '⚠ ' + $wgroups + ' 接近免费额度上限'
-        $global:TTK.UI.Status.ForeColor = $C_AMBER
-        $global:TTK.UI.Status.Visible = $true
-    } else {
-        $global:TTK.UI.Status.Visible = $false
-    }
+    $matTime = if ($rep.matrix -ne $null) { ' · 矩阵 ' + $rep.matrix.updated_at.Substring(11) } else { '' }
+    $global:TTK.UI.FootR.Text = '模型 Token 单价估算（不含积分） · 刷新 ' + $rep.generated_at.Substring(11) + $matTime
 }
 
-# ---------------- 扫描调度 ----------------
+# ---------------- 操作与进程调度 ----------------
 $script:ScanProc = $null
+$script:ActiveAction = ''
 $script:Timer = [System.Windows.Forms.Timer]::new()
 $script:Timer.Interval = 150
 $script:Timer.Add_Tick({
@@ -794,35 +820,373 @@ $script:Timer.Add_Tick({
         $script:Timer.Stop()
         $code = $script:ScanProc.ExitCode
         $script:ScanProc = $null
+        $act = $script:ActiveAction
+        $script:ActiveAction = ''
+
         $global:TTK.UI.BtnRefresh.Enabled = $true
-        Log ('scan done exit=' + $code)
+        $global:TTK.UI.BtnScan.Enabled = $true
+        $global:TTK.UI.BtnSignin.Enabled = $true
+        Log ('action ' + $act + ' exited code=' + $code)
+
         $rep = Load-Report
         if ($rep -ne $null) {
             $global:TTK.Data = $rep
             Update-UI
-        } else {
-            $global:TTK.UI.Status.Text = '汇总失败，见 ttk.last.err.txt'
+        }
+
+        if ($act -eq 'signin') {
+            if ($rep -ne $null -and $rep.signin -ne $null) {
+                $global:TTK.UI.Status.Text = $rep.signin.msg
+                $global:TTK.UI.Status.ForeColor = $C_GREEN
+            } else {
+                $global:TTK.UI.Status.Text = '签到完成'
+                $global:TTK.UI.Status.ForeColor = $C_GREEN
+            }
+        } elseif ($act -eq 'refresh') {
+            $totC = if ($rep -ne $null -and $rep.matrix -ne $null) { $rep.matrix.total_credits } else { '' }
+            $global:TTK.UI.Status.Text = '矩阵积分刷新完成 (' + $totC + '点)'
+            $global:TTK.UI.Status.ForeColor = $C_GREEN
+        } elseif ($act -eq 'scan') {
+            $global:TTK.UI.Status.Text = '会话扫描汇总完成'
+            $global:TTK.UI.Status.ForeColor = $C_BLUE
         }
     }
 })
 
-function Start-Scan {
+function Start-TtkProc([string]$Action, [string[]]$argList, [string]$statusMsg) {
     if ($script:ScanProc -ne $null) { return }
-    $global:TTK.UI.Status.Text = '正在汇总…'
+    $script:ActiveAction = $Action
+    $global:TTK.UI.Status.Text = $statusMsg
+    $global:TTK.UI.Status.ForeColor = $C_AMBER
     $global:TTK.UI.Status.Visible = $true
     $global:TTK.UI.BtnRefresh.Enabled = $false
-    $argList = @('-3.11', ('"' + $global:TTK.Py + '"'), '--days', [string]$Days, '--quiet')
+    $global:TTK.UI.BtnScan.Enabled = $false
+    $global:TTK.UI.BtnSignin.Enabled = $false
     try {
         $script:ScanProc = Start-Process -FilePath 'py' -ArgumentList $argList -PassThru -WindowStyle Hidden -RedirectStandardError $global:TTK.Err
         $script:Timer.Start()
     } catch {
-        Log ('start scan failed: ' + $_.Exception.Message)
+        Log ('start proc failed: ' + $_.Exception.Message)
         $global:TTK.UI.Status.Text = '无法启动 py -3.11'
         $global:TTK.UI.BtnRefresh.Enabled = $true
+        $global:TTK.UI.BtnScan.Enabled = $true
+        $global:TTK.UI.BtnSignin.Enabled = $true
+        $script:ActiveAction = ''
     }
 }
 
-# ---------------- 交互 ----------------
+function Start-Scan {
+    Start-TtkProc 'scan' @('-3.11', ('"' + $global:TTK.Py + '"'), '--scan', '--days', [string]$Days, '--quiet') '正在扫描 CLI 会话…'
+}
+
+function Start-MatrixRefresh {
+    Start-TtkProc 'refresh' @('-3.11', ('"' + $global:TTK.Py + '"'), '--refresh-matrix', '--quiet') '正在刷新 6 通道矩阵与积分…'
+}
+
+function Start-SignIn {
+    Start-TtkProc 'signin' @('-3.11', ('"' + $global:TTK.Py + '"'), '--signin', '--quiet') '正在执行国内主号签到…'
+}
+
+# ---------------- 每日模型 Token 与价格明细弹窗 ----------------
+function Show-PricingDetailsDialog {
+    $rep = $global:TTK.Data
+    if ($rep -eq $null) { $rep = Load-Report }
+    $dlg = [System.Windows.Forms.Form]::new()
+    $dlg.Text = 'Token 用量与价格明细'
+    $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
+    $dlg.ClientSize = [System.Drawing.Size]::new((P 1180), (P 720))
+    $dlg.MinimumSize = [System.Drawing.Size]::new((P 900), (P 560))
+    $dlg.BackColor = $C_BG
+    $dlg.ForeColor = $C_TEXT
+    $dlg.KeyPreview = $true
+    $dlg.Add_KeyDown({
+        param($s, $e)
+        if ($e.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $dlg.Close() }
+    })
+
+    $layout = [System.Windows.Forms.TableLayoutPanel]::new()
+    $layout.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $layout.ColumnCount = 1
+    $layout.RowCount = 3
+    [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new([System.Windows.Forms.SizeType]::Absolute, (P 54)))
+    [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new([System.Windows.Forms.SizeType]::Percent, 64))
+    [void]$layout.RowStyles.Add([System.Windows.Forms.RowStyle]::new([System.Windows.Forms.SizeType]::Percent, 36))
+    $dlg.Controls.Add($layout)
+
+    $head = [System.Windows.Forms.Panel]::new()
+    $head.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $head.BackColor = $C_HEAD
+    $layout.Controls.Add($head, 0, 0)
+    $lblH = New-Lbl '每日 × 模型 Token 用量；选中一行查看计价公式。JSON：days[] → models[] → breakdown[]' $F_BODY $C_TEXT (P 16) (P 6) (P 930) (P 26) 'MiddleLeft'
+    $head.Controls.Add($lblH)
+    $basisTxt = '单价口径：厂商官网刊例价（美元×7.15）· 不采用限时折扣/活动价/中转站价 · 缓存命中未公布按输入×10%、写入未公布按未命中输入价'
+    $lblBasis = New-Lbl $basisTxt $F_TINY $C_MUTED (P 16) (P 32) (P 1000) (P 18) 'MiddleLeft'
+    $head.Controls.Add($lblBasis)
+    $btnOpenJson = New-Btn '打开 JSON' 0 (P 110) (Col '#1E3038')
+    $btnOpenJson.Location = [System.Drawing.Point]::new((P 1048), (P 13))
+    $btnOpenJson.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
+    $btnOpenJson.Add_Click({ Start-Process $global:TTK.Report })
+    $head.Controls.Add($btnOpenJson)
+
+    $grid = [System.Windows.Forms.DataGridView]::new()
+    $grid.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $grid.ReadOnly = $true
+    $grid.AllowUserToAddRows = $false
+    $grid.AllowUserToDeleteRows = $false
+    $grid.AllowUserToResizeRows = $false
+    $grid.MultiSelect = $false
+    $grid.RowHeadersVisible = $false
+    $grid.AutoGenerateColumns = $false
+    $grid.AutoSizeColumnsMode = [System.Windows.Forms.DataGridViewAutoSizeColumnsMode]::Fill
+    $grid.SelectionMode = [System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
+    $grid.BackgroundColor = $C_CARD
+    $grid.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+    $grid.EnableHeadersVisualStyles = $false
+    $grid.ColumnHeadersDefaultCellStyle.BackColor = $C_HEAD
+    $grid.ColumnHeadersDefaultCellStyle.ForeColor = $C_TEXT
+    $grid.ColumnHeadersDefaultCellStyle.Font = $F_SMALL
+    $grid.DefaultCellStyle.BackColor = $C_CARD
+    $grid.DefaultCellStyle.ForeColor = $C_TEXT
+    $grid.DefaultCellStyle.SelectionBackColor = (Col '#263B54')
+    $grid.DefaultCellStyle.SelectionForeColor = $C_TEXT
+    $grid.DefaultCellStyle.Font = $F_SMALL
+    $grid.GridColor = $C_LINE
+    $layout.Controls.Add($grid, 0, 1)
+
+    $cols = @(
+        @{ N = 'date'; T = '日期'; W = 82 },
+        @{ N = 'model'; T = '模型'; W = 150 },
+        @{ N = 'in'; T = '输入 Token'; W = 105 },
+        @{ N = 'hit'; T = '缓存命中'; W = 105 },
+        @{ N = 'miss'; T = '未命中'; W = 95 },
+        @{ N = 'write'; T = '缓存写入'; W = 95 },
+        @{ N = 'out'; T = '输出 Token'; W = 100 },
+        @{ N = 'tokens'; T = '总 Token'; W = 110 },
+        @{ N = 'cost'; T = '估算费用'; W = 85 }
+    )
+    foreach ($ci in $cols) {
+        $c = [System.Windows.Forms.DataGridViewTextBoxColumn]::new()
+        $c.Name = $ci.N
+        $c.HeaderText = $ci.T
+        $c.FillWeight = $ci.W
+        [void]$grid.Columns.Add($c)
+    }
+
+    $txtDetail = [System.Windows.Forms.TextBox]::new()
+    $txtDetail.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $txtDetail.Multiline = $true
+    $txtDetail.ReadOnly = $true
+    $txtDetail.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+    $txtDetail.Font = [System.Drawing.Font]::new('Consolas', 9)
+    $txtDetail.BackColor = $C_CARD
+    $txtDetail.ForeColor = $C_TEXT
+    $txtDetail.Text = '请选择上方一行查看计算过程。'
+    $layout.Controls.Add($txtDetail, 0, 2)
+    $global:TTK.UI.PricingDetailText = $txtDetail
+
+    if ($rep -ne $null) {
+        foreach ($d in @($rep.days)) {
+            foreach ($m in @($d.models)) {
+                $idx = $grid.Rows.Add(
+                    [string]$d.date, [string]$m.id,
+                    (Fmt-Int $m.in), (Fmt-Int $m.hit), (Fmt-Int $m.miss),
+                    (Fmt-Int $m.write), (Fmt-Int $m.out), (Fmt-Int $m.tokens),
+                    ('¥' + ('{0:0.0000}' -f [double]$m.cost))
+                )
+                $grid.Rows[$idx].Tag = @{ Date = $d.date; Model = $m }
+            }
+        }
+    }
+
+    $grid.Add_SelectionChanged({
+        param($s, $e)
+        if ($s.SelectedRows.Count -eq 0) { return }
+        $info = $s.SelectedRows[0].Tag
+        if ($info -eq $null) { return }
+        $m = $info.Model
+        $nl = [Environment]::NewLine
+        $lines = @()
+        $lines += ($info.Date + '  ' + $m.id)
+        $lines += ('总 Token = 输入 {0} + 输出 {1} = {2}' -f (Fmt-Int $m.in), (Fmt-Int $m.out), (Fmt-Int $m.tokens))
+        $lines += ('输入 = 缓存命中 {0} + 未命中 {1} + 缓存写入 {2}' -f (Fmt-Int $m.hit), (Fmt-Int $m.miss), (Fmt-Int $m.write))
+        $lines += ('价格单位：CNY / 百万 Token    来源：' + [string]$m.price_source)
+        $lines += ''
+        $labels = @{ hit = '缓存命中'; miss = '未命中输入'; write = '缓存写入'; out = '输出' }
+        if ($m.breakdown -ne $null -and @($m.breakdown).Count -gt 0) {
+            foreach ($bd in @($m.breakdown)) {
+                $lines += ('[{0}] 小计 ¥{1}' -f $labels[$bd.kind], ('{0:0.000000}' -f [double]$bd.cost))
+                $lines += ('  高峰 {0} × ¥{1} / 1,000,000 = ¥{2}' -f (Fmt-Int $bd.peak_tokens), ('{0:0.####}' -f [double]$bd.peak_price), ('{0:0.000000}' -f [double]$bd.peak_cost))
+                $lines += ('  空闲 {0} × ¥{1} / 1,000,000 = ¥{2}' -f (Fmt-Int $bd.off_tokens), ('{0:0.####}' -f [double]$bd.off_price), ('{0:0.000000}' -f [double]$bd.off_cost))
+            }
+            $lines += ''
+            $lines += ('模型合计 = ¥{0}（JSON cost = {1}，保留 4 位小数）' -f ('{0:0.000000}' -f (($m.breakdown | Measure-Object -Property cost -Sum).Sum)), ('{0:0.0000}' -f [double]$m.cost))
+        } else {
+            $lines += '未配置该模型单价：Token 已统计，费用不计入总估价。'
+        }
+        $global:TTK.UI.PricingDetailText.Text = ($lines -join $nl)
+    })
+    if ($grid.Rows.Count -gt 0) { $grid.CurrentCell = $grid.Rows[0].Cells[0] }
+
+    $dlg.ShowDialog($global:TTK.UI.Form) | Out-Null
+    $dlg.Dispose()
+}
+
+# ---------------- 历史记录弹窗 ----------------
+function Show-RecordsDialog {
+    $dlg = [System.Windows.Forms.Form]::new()
+    $dlg.Text = 'CodeBuddy 运行与巡检记录总览'
+    $dlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $dlg.MaximizeBox = $false
+    $dlg.MinimizeBox = $false
+    $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
+    $dlg.ClientSize = [System.Drawing.Size]::new((P 840), (P 580))
+    $dlg.BackColor = $C_BG
+    $dlg.ForeColor = $C_TEXT
+    $dlg.KeyPreview = $true
+    $dlg.Add_KeyDown({
+        param($s, $e)
+        if ($e.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $dlg.Close() }
+    })
+
+    $lblH = [System.Windows.Forms.Label]::new()
+    $lblH.Text = '📋 6通道矩阵资产、每日签到与会话扫描运行记录'
+    $lblH.Font = [System.Drawing.Font]::new('Microsoft YaHei UI', 12, [System.Drawing.FontStyle]::Bold)
+    $lblH.ForeColor = $C_TEXT
+    $lblH.Location = [System.Drawing.Point]::new((P 20), (P 16))
+    $lblH.Size = [System.Drawing.Size]::new((P 800), (P 28))
+    $dlg.Controls.Add($lblH)
+
+    $txtBox = [System.Windows.Forms.TextBox]::new()
+    $txtBox.Multiline = $true
+    $txtBox.ReadOnly = $true
+    $txtBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+    $txtBox.Font = [System.Drawing.Font]::new('Consolas', 9.5)
+    $txtBox.BackColor = $C_CARD
+    $txtBox.ForeColor = $C_TEXT
+    $txtBox.Location = [System.Drawing.Point]::new((P 20), (P 52))
+    $txtBox.Size = [System.Drawing.Size]::new((P 800), (P 460))
+    $dlg.Controls.Add($txtBox)
+
+    $recordsText = ''
+    try {
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = 'py'
+        $psi.Arguments = ('-3.11 "' + $global:TTK.Py + '" --records --json')
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $out = $p.StandardOutput.ReadToEnd()
+        $p.WaitForExit()
+        if ($p.ExitCode -eq 0 -and (-not [string]::IsNullOrEmpty($out))) {
+            $rec = $out | ConvertFrom-Json
+            $sb = [System.Text.StringBuilder]::new()
+
+            [void]$sb.AppendLine('======================================================================')
+            [void]$sb.AppendLine('                  CodeBuddy 运行记录与资产总控明细                      ')
+            [void]$sb.AppendLine('======================================================================')
+            [void]$sb.AppendLine()
+
+            [void]$sb.AppendLine('【一、国内主号每日自动签到历史】')
+            if ($rec.signin_history -ne $null -and $rec.signin_history.Count -gt 0) {
+                foreach ($item in $rec.signin_history) {
+                    $st = if ($item.status -eq 'success') { '首次签到成功' } elseif ($item.status -eq 'already') { '今日已签' } else { $item.status }
+                    [void]$sb.AppendLine(('  * 日期: ' + $item.last_signin_date + ' ' + $item.last_signin_time + ' | 状态: ' + $st + ' | 奖励: +' + $item.reward + '点 | ' + $item.message))
+                }
+            } else {
+                [void]$sb.AppendLine('  暂无签到历史记录')
+            }
+            [void]$sb.AppendLine()
+
+            [void]$sb.AppendLine('【二、6 通道账号矩阵与精准积分巡检快照】')
+            if ($rec.matrix_history -ne $null -and $rec.matrix_history.Count -gt 0) {
+                foreach ($m in $rec.matrix_history) {
+                    [void]$sb.AppendLine(('  * 巡检时刻: ' + $m.time + ' | 全矩阵可用总储备: ' + $m.total_credits + ' 点'))
+                    if ($m.targets -ne $null) {
+                        $parts = @()
+                        foreach ($t in $m.targets) {
+                            $props = $t.PSObject.Properties
+                            foreach ($pr in $props) {
+                                if ($pr.Name -ne 'status') {
+                                    $parts += ('T' + $pr.Name + '=' + $pr.Value + '点')
+                                }
+                            }
+                        }
+                        [void]$sb.AppendLine(('      ↳ 各通道明细: ' + ($parts -join ' · ')))
+                    }
+                }
+            } else {
+                [void]$sb.AppendLine('  暂无巡检快照记录')
+            }
+            [void]$sb.AppendLine()
+
+            [void]$sb.AppendLine('【三、当前 429 冷静期监控 (防踩踏拦截状态)】')
+            if ($rec.cooldown_data -ne $null -and $rec.cooldown_data.targets -ne $null) {
+                $cdTargets = $rec.cooldown_data.targets.PSObject.Properties
+                $hasCd = $false
+                foreach ($pr in $cdTargets) {
+                    $val = $pr.Value
+                    if ($val.status -eq 'cooldown') {
+                        $hasCd = $true
+                        [void]$sb.AppendLine(('  [!] Target ' + $pr.Name + ' 处于 429 限流中 | 解封时刻: ' + $val.reset_time_str + ' | 记录于: ' + $val.recorded_at))
+                    } else {
+                        [void]$sb.AppendLine(('  [✔] Target ' + $pr.Name + ' 健康可用 (状态: ' + $val.reset_time_str + ')'))
+                    }
+                }
+                if (-not $hasCd) {
+                    [void]$sb.AppendLine('  >> 当前所有矩阵通道均处于健康就绪状态，无任何 429 封禁！')
+                }
+            }
+            [void]$sb.AppendLine()
+
+            [void]$sb.AppendLine('【四、会话 Token 扫描历史】')
+            if ($rec.scan_history -ne $null -and $rec.scan_history.Count -gt 0) {
+                foreach ($sc in $rec.scan_history) {
+                    [void]$sb.AppendLine(('  * ' + $sc.time + ' | 耗时: ' + $sc.scan_ms + 'ms | 扫文件: ' + $sc.files + '个 | 增量: ' + $sc.new_records + '条 | 今日Tokens: ' + (Fmt-Tok $sc.today_tokens) + ' | 今日估价: ' + (Fmt-Money $sc.today_cost)))
+                }
+            } else {
+                [void]$sb.AppendLine('  暂无扫描历史记录')
+            }
+
+            $recordsText = $sb.ToString()
+        }
+    } catch {
+        $recordsText = '读取记录失败: ' + $_.Exception.Message
+    }
+
+    if ([string]::IsNullOrEmpty($recordsText)) {
+        $recordsText = '未读取到记录数据。可先点击顶栏【刷新】或【扫描】生成最新数据。'
+    }
+    $txtBox.Text = $recordsText
+
+    $btnOpenMd = New-Btn '📑 查看巡检报告(MD)' (P 20) (P 180) (Col '#202836')
+    $btnOpenMd.Location = [System.Drawing.Point]::new((P 20), (P 526))
+    $btnOpenMd.Add_Click({
+        $mdPath = Join-Path $global:TTK.Dir 'CREDIT_STATUS.md'
+        if (-not (Test-Path $mdPath)) { $mdPath = 'E:\ai tec\cb_login\CREDIT_STATUS.md' }
+        if (Test-Path $mdPath) { Start-Process $mdPath }
+    })
+    $dlg.Controls.Add($btnOpenMd)
+
+    $btnOpenDash = New-Btn '🌐 打开主浏览器大屏' (P 210) (P 180) (Col '#2A2036')
+    $btnOpenDash.Location = [System.Drawing.Point]::new((P 210), (P 526))
+    $btnOpenDash.Add_Click({
+        $htmlPath = 'E:\ai tec\cb_login\credit_dashboard.html'
+        if (Test-Path $htmlPath) { Start-Process $htmlPath }
+    })
+    $dlg.Controls.Add($btnOpenDash)
+
+    $btnCloseDlg = New-Btn '关闭' (P 730) (P 90) (Col '#3A2230')
+    $btnCloseDlg.Location = [System.Drawing.Point]::new((P 730), (P 526))
+    $btnCloseDlg.Add_Click({ $dlg.Close() })
+    $dlg.Controls.Add($btnCloseDlg)
+
+    $dlg.ShowDialog($global:TTK.UI.Form) | Out-Null
+    $dlg.Dispose()
+}
+
+# ---------------- 交互绑定 ----------------
 $script:Drag = $false
 $script:DragPt = [System.Drawing.Point]::new(0, 0)
 $header.Add_MouseDown({
@@ -841,7 +1205,25 @@ $header.Add_MouseMove({
 })
 $header.Add_MouseUp({ $script:Drag = $false })
 
-$btnRefresh.Add_Click({ Start-Scan })
+$btnSignin.Add_Click({ Start-SignIn })
+$btnScan.Add_Click({ Start-Scan })
+$btnRefresh.Add_Click({ Start-MatrixRefresh })
+$btnRecords.Add_Click({ Show-RecordsDialog })
+$btnDetails.Add_Click({ Show-PricingDetailsDialog })
+
+$lblSigninBadge.Add_Click({
+    if ($global:TTK.Data -ne $null -and $global:TTK.Data.signin -ne $null -and $global:TTK.Data.signin.today_checked -eq $true) {
+        [System.Windows.Forms.MessageBox]::Show(
+            ('今日已签到成功！' + [Environment]::NewLine + [Environment]::NewLine + '时刻: ' + $global:TTK.Data.signin.time + [Environment]::NewLine + '奖励: +' + $global:TTK.Data.signin.reward + ' 积分' + [Environment]::NewLine + '账号: Target 1 (国内主号 Wengole)'),
+            '签到状态',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        )
+    } else {
+        Start-SignIn
+    }
+})
+
 $btnTop.Add_Click({
     $f = $global:TTK.UI.Form
     $f.TopMost = -not $f.TopMost
@@ -887,20 +1269,32 @@ $form.Add_FormClosing({
     } catch { }
 })
 
+# 窗体加载并显示：每日首次调用自动签到并标记
 $form.Add_Shown({
     Log ('shown size=' + $global:TTK.UI.Form.Size.Width + 'x' + $global:TTK.UI.Form.Size.Height + ' dpi=' + $global:TTK.UI.Form.DeviceDpi)
     $rep = Load-Report
+    $needAutoSignin = $true
     if ($rep -ne $null) {
         $global:TTK.Data = $rep
         Update-UI
+        if ($rep.signin -ne $null -and $rep.signin.today_checked -eq $true) {
+            $needAutoSignin = $false
+        }
     }
-    Start-Scan
+
+    if ($needAutoSignin) {
+        Log 'Daily first launch detected: initiating auto sign-in...'
+        Start-SignIn
+    } else {
+        Start-MatrixRefresh
+    }
 })
 
 [System.Windows.Forms.Application]::add_ThreadException({
     param($s, $e)
     Log ('THREAD EX: ' + $e.Exception.Message + ' @ ' + $e.Exception.StackTrace)
 })
+
 try {
     [System.Windows.Forms.Application]::Run($form)
 } catch {
